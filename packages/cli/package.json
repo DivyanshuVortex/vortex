@@ -1,0 +1,25 @@
+{
+  "name": "@vortex/cli",
+  "version": "0.1.0",
+  "description": "Vortex CLI - The main entry point",
+  "main": "./dist/index.js",
+  "bin": {
+    "vortex": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --watch",
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vortex/engine": "workspace:*",
+    "@vortex/shared": "workspace:*",
+    "commander": "^12.0.0"
+  },
+  "devDependencies": {
+    "@vortex/typescript-config": "workspace:*",
+    "tsup": "^8.0.2",
+    "typescript": "5.9.2"
+  }
+}

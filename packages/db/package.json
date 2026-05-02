@@ -1,0 +1,21 @@
+{
+  "name": "@vortex/db",
+  "version": "0.1.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --watch",
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0"
+  },
+  "devDependencies": {
+    "@vortex/typescript-config": "workspace:*",
+    "@types/better-sqlite3": "^7.6.10",
+    "tsup": "^8.0.2",
+    "typescript": "5.9.2"
+  }
+}

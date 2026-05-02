@@ -1,0 +1,20 @@
+{
+  "name": "@vortex/github",
+  "version": "0.1.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --watch",
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "octokit": "^3.1.2"
+  },
+  "devDependencies": {
+    "@vortex/typescript-config": "workspace:*",
+    "tsup": "^8.0.2",
+    "typescript": "5.9.2"
+  }
+}

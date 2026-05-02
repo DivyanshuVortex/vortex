@@ -1,0 +1,20 @@
+{
+  "name": "@vortex/worker",
+  "version": "0.1.0",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm",
+    "dev": "tsup src/index.ts --format cjs,esm --watch",
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vortex/engine": "workspace:*",
+    "bullmq": "^5.7.0"
+  },
+  "devDependencies": {
+    "@vortex/typescript-config": "workspace:*",
+    "tsup": "^8.0.2",
+    "typescript": "5.9.2"
+  }
+}
