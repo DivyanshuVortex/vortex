@@ -24,7 +24,7 @@ vortex/
 
   config/
     tsconfig.base.json       # Base TypeScript configuration
-    turbo.json               # Turborepo configuration
+  turbo.json                 # Turborepo configuration
 ```
 
 ## Getting Started

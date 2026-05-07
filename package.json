@@ -2,11 +2,11 @@
   "name": "vortex",
   "private": true,
   "scripts": {
-    "build": "turbo run build --config config/turbo.json",
-    "dev": "turbo run dev --config config/turbo.json",
-    "lint": "turbo run lint --config config/turbo.json",
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types --config config/turbo.json"
+    "check-types": "turbo run check-types"
   },
   "devDependencies": {
     "prettier": "^3.7.4",
