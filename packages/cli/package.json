@@ -8,18 +8,26 @@
   },
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts",
-    "dev": "tsup src/index.ts --format cjs,esm --watch",
+    "dev": "tsx src/index.ts",
+    "watch": "tsup src/index.ts --format cjs,esm --watch",
     "lint": "eslint .",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@octokit/rest": "^22.0.1",
     "@vortex/engine": "workspace:*",
     "@vortex/shared": "workspace:*",
-    "commander": "^12.0.0"
+    "chalk": "^5.6.2",
+    "commander": "^12.1.0",
+    "dotenv": "^17.4.2",
+    "ora": "^9.4.0",
+    "parse-diff": "^0.12.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@vortex/typescript-config": "workspace:*",
     "tsup": "^8.0.2",
+    "tsx": "^4.21.0",
     "typescript": "5.9.2"
   }
 }
