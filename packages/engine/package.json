@@ -4,16 +4,17 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "build": "tsup src/index.ts --format cjs,esm",
     "dev": "tsup src/index.ts --format cjs,esm --watch",
     "lint": "eslint .",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@google/genai": "^2.5.0",
+    "@vortex/db": "workspace:*",
     "@vortex/git": "workspace:*",
     "@vortex/github": "workspace:*",
-    "@vortex/retrieval": "workspace:*",
-    "@vortex/db": "workspace:*"
+    "@vortex/retrieval": "workspace:*"
   },
   "devDependencies": {
     "@vortex/typescript-config": "workspace:*",

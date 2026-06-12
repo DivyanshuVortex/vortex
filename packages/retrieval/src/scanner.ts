@@ -12,8 +12,8 @@ function loadGitignore(dir : string){
         // No .gitignore file, ignore silently
     }
 
-    ign.add( ['.git' , 'node_modules' , 'dist' , 'build' , 'out' , 'coverage' , 'logs' , '*.log'] );
-
+      ign.add(["node_modules", ".git", "dist", "build", "out", ".next",
+            "coverage", "logs", "*.log", ".*"]);
     return ign;
 }
 

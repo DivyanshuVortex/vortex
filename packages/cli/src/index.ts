@@ -1,6 +1,20 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import { Indexer, IntelligenceAgent } from "@vortex/engine";
+import { createGithubClient } from "@vortex/github";
+import * as fs from "fs";
+import * as path from "path";
+import * as chokidar from "chokidar";
+import * as dotenv from "dotenv";
+
+// Load .env from the root of the monorepo
+dotenv.config({ path: path.resolve(process.cwd(), "../../.env") });
+
+import { initCommand } from "./commands/init";
+import { searchCommand } from "./commands/search";
+import { reviewCommand } from "./commands/review";
+import { issueCommand } from "./commands/issue";
 
 const program = new Command();
 
@@ -11,64 +25,30 @@ program
 
 program
   .command("init")
-  .description(
-    "Initialize repository intelligence, embeddings, and PR history"
-  )
-  .option(
-    "--reindex",
-    "Rebuild repository embeddings while preserving historical PR intelligence"
-  )
-  .action((options) => {
-    console.log("Initializing Vortex intelligence layer...");
+  .description("Initialize repository intelligence, embeddings, and PR history")
+  .option("--reindex", "Rebuild repository embeddings while preserving historical PR intelligence")
+  .action(initCommand);
 
-    if (options.reindex) {
-      console.log("Rebuilding repository embeddings...");
-      console.log(
-        "Preserving historical PR findings and feedback memory..."
-      );
-    }
-
-    console.log("Indexing repository chunks...");
-    console.log("Loading latest PR metadata...");
-  });
+program
+  .command("search")
+  .description("Search the indexed codebase semantically and get an AI explanation")
+  .requiredOption("-q, --query <text>", "Search query")
+  .option("-l, --limit <number>", "Number of results to consider", "5")
+  .action(searchCommand);
 
 program
   .command("review")
-  .description(
-    "Review your changes using repository intelligence and historical PR patterns"
-  )
-  .requiredOption(
-    "--pr <number>",
-    "Pull request number",
-    Number
-  )
-  .option(
-    "--files <paths>",
-    "Comma-separated list of target files"
-  )
-  .option(
-    "--deep",
-    "Enable deep review analysis"
-  )
-  .action((options) => {
-    console.log(`Reviewing PR #${options.pr}`);
+  .description("Review your changes using repository intelligence and historical PR patterns")
+  .requiredOption("--pr <number>", "Pull request number", Number)
+  .option("--files <paths>", "Comma-separated list of target files")
+  .option("--deep", "Enable deep review analysis")
+  .action(reviewCommand);
 
-    if (options.files) {
-      const files = options.files
-        .split(",")
-        .map((file: string) => file.trim());
-
-      console.log("Target files:", files);
-    }
-
-    if (options.deep) {
-      console.log("Deep repository analysis enabled");
-    }
-
-    console.log("Searching for similar PRs...");
-    console.log("Loading historical findings...");
-    console.log("Generating developer feedback...");
-  });
+program
+  .command("issue")
+  .description("Analyze a GitHub issue, locate relevant codebase files, and propose a fix")
+  .requiredOption("--id <number>", "Issue number", Number)
+  .action(issueCommand);
 
 program
   .command("suggest")
@@ -87,19 +67,26 @@ program
     "--deep",
     "Enable advanced contextual suggestions"
   )
-  .action((options) => {
+  .action(async (options) => {
     console.log(`Generating suggestions for: ${options.file}`);
 
-    if (options.deep) {
-      console.log("Using deep contextual analysis...");
+    if (!fs.existsSync(options.file)) {
+      console.error(`File not found: ${options.file}`);
+      return;
     }
 
-    if (options.apply) {
-      console.log("Applying generated suggestions...");
+    try {
+      const content = fs.readFileSync(options.file, "utf8");
+      const agent = new IntelligenceAgent();
+      
+      console.log("Analyzing file...");
+      const suggestions = await agent.generateSuggestions(content);
+      
+      console.log("\n--- SUGGESTIONS ---\n");
+      console.log(suggestions);
+    } catch (err) {
+      console.error("Failed to generate suggestions:", err);
     }
-
-    console.log("Retrieving similar historical PRs...");
-    console.log("Analyzing repository conventions...");
   });
 
 program
@@ -119,28 +106,39 @@ program
     "--files <paths>",
     "Comma-separated list of target files"
   )
-  .action((options) => {
+  .action(async (options) => {
     console.log("Fixing repository nitbits...");
 
-    if (options.files) {
-      const files = options.files
-        .split(",")
-        .map((file: string) => file.trim());
-
-      console.log("Target files:", files);
+    if (!options.files) {
+      console.error("Please provide --files to fix.");
+      return;
     }
 
-    if (options.safe) {
-      console.log("Safe fix mode enabled");
-    }
+    const files = options.files.split(",").map((file: string) => file.trim());
+    const agent = new IntelligenceAgent();
 
-    if (options.dryRun) {
-      console.log("Running in dry-run mode");
-    }
+    for (const file of files) {
+      if (!fs.existsSync(file)) {
+        console.warn(`File not found: ${file}`);
+        continue;
+      }
 
-    console.log("Checking formatting...");
-    console.log("Checking edge cases...");
-    console.log("Checking tests and CI...");
+      try {
+        console.log(`Auto-fixing ${file}...`);
+        const content = fs.readFileSync(file, "utf8");
+        const fixedContent = await agent.autoFix(content);
+        
+        if (options.dryRun) {
+          console.log(`\n--- FIXED OUTPUT FOR ${file} ---\n`);
+          console.log(fixedContent);
+        } else {
+          fs.writeFileSync(file, fixedContent, "utf8");
+          console.log(`✅ Fixed and saved ${file}`);
+        }
+      } catch (err) {
+        console.error(`Failed to fix ${file}:`, err);
+      }
+    }
   });
 
 program
@@ -157,16 +155,31 @@ program
     "--deep",
     "Enable advanced PR intelligence analysis"
   )
-  .action((options) => {
+  .action(async (options) => {
     console.log(`Analyzing external PR #${options.pr}`);
-
-    if (options.deep) {
-      console.log("Running deep architectural analysis...");
+    
+    // We reuse the review logic for now, but in a real app this would
+    // have a specialized prompt focused on security/contribution guidelines.
+    if (!process.env.GITHUB_TOKEN) {
+      console.error("Please set GITHUB_TOKEN environment variable.");
+      return;
     }
 
-    console.log("Checking contributor patterns...");
-    console.log("Loading historical regression data...");
-    console.log("Analyzing repository impact...");
+    const owner = process.env.GITHUB_OWNER || "divyanshu";
+    const repo = process.env.GITHUB_REPO || "vortex";
+
+    try {
+      const github = createGithubClient(process.env.GITHUB_TOKEN);
+      const diff = await github.fetchPullRequestDiff(owner, repo, options.pr);
+
+      const agent = new IntelligenceAgent();
+      const review = await agent.generateReview(diff);
+
+      console.log("\n--- EXTERNAL PR ANALYSIS ---\n");
+      console.log(review);
+    } catch (err) {
+      console.error("Failed to analyze PR:", err);
+    }
   });
 
 program
@@ -179,14 +192,41 @@ program
     "Enable deep live analysis"
   )
   .action((options) => {
-    console.log("Watching repository changes...");
+    console.log("Watching repository changes for live AI feedback...");
 
     if (options.deep) {
-      console.log("Deep live analysis enabled");
+      console.log("Deep live analysis enabled (may consume more API tokens).");
     }
 
-    console.log("Monitoring diffs...");
-    console.log("Running live review engine...");
+    const watcher = chokidar.watch(process.cwd(), {
+      ignored: /(^|[\/\\])\..|node_modules|dist/, // ignore dotfiles, node_modules, dist
+      persistent: true
+    });
+
+    const agent = new IntelligenceAgent();
+    let isProcessing = false;
+
+    watcher.on("change", async (path) => {
+      if (isProcessing) return; // Debounce or ignore if already processing
+      
+      console.log(`\nDetected change in ${path}. Analyzing...`);
+      isProcessing = true;
+
+      try {
+        const content = fs.readFileSync(path, "utf8");
+        const feedback = await agent.generateSuggestions(content);
+        
+        console.log(`\n--- LIVE AI FEEDBACK FOR ${path} ---\n`);
+        console.log(feedback);
+      } catch (err) {
+        console.error("Analysis failed:", err);
+      } finally {
+        isProcessing = false;
+        console.log("\nWatching for more changes...");
+      }
+    });
+
+    console.log("Started watcher. Press Ctrl+C to exit.");
   });
 
 program.parse();

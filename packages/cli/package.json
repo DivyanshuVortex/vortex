@@ -7,7 +7,7 @@
     "vortex": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "build": "tsup src/index.ts --format cjs,esm",
     "dev": "tsx src/index.ts",
     "watch": "tsup src/index.ts --format cjs,esm --watch",
     "lint": "eslint .",
@@ -15,11 +15,18 @@
   },
   "dependencies": {
     "@octokit/rest": "^22.0.1",
+    "@types/marked-terminal": "^6.1.1",
     "@vortex/engine": "workspace:*",
+    "@vortex/github": "workspace:*",
+    "@vortex/git": "workspace:*",
     "@vortex/shared": "workspace:*",
+    "boxen": "7",
     "chalk": "^5.6.2",
+    "chokidar": "^5.0.0",
     "commander": "^12.1.0",
     "dotenv": "^17.4.2",
+    "marked": "^15.0.12",
+    "marked-terminal": "^7.3.0",
     "ora": "^9.4.0",
     "parse-diff": "^0.12.0",
     "zod": "^4.4.3"

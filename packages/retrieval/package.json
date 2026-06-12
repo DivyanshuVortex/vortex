@@ -7,16 +7,21 @@
     "build": "tsup src/index.ts --format cjs,esm --dts",
     "dev": "tsup src/index.ts --format cjs,esm --watch",
     "lint": "eslint .",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test:pipeline": "tsx --env-file=../../.env src/test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.19.17",
     "@vortex/typescript-config": "workspace:*",
-    "tsup": "^8.0.2"
+    "tsup": "^8.0.2",
+    "tsx": "^4.21.0"
   },
   "dependencies": {
+    "@google/genai": "^2.5.0",
     "@huggingface/transformers": "^4.2.0",
+    "@xenova/transformers": "^2.10.0",
     "ignore": "^7.0.5",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "@vortex/db": "workspace:*"
   }
 }

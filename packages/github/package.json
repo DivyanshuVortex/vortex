@@ -4,14 +4,14 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "build": "tsup src/index.ts --format cjs,esm",
     "dev": "tsup src/index.ts --format cjs,esm --watch",
     "lint": "eslint .",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "dotenv": "^17.4.2",
-    "octokit": "^3.1.2"
+    "@octokit/rest": "^21.0.0"
   },
   "devDependencies": {
     "@vortex/typescript-config": "workspace:*",

@@ -10,11 +10,11 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "better-sqlite3": "^11.0.0"
+    "@prisma/client": "^5.14.0"
   },
   "devDependencies": {
     "@vortex/typescript-config": "workspace:*",
-    "@types/better-sqlite3": "^7.6.10",
+    "prisma": "^5.14.0",
     "tsup": "^8.0.2",
     "typescript": "5.9.2"
   }

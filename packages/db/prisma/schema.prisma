@@ -1,0 +1,29 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./vortex.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Chunk {
+  id           String   @id
+  file         String
+  language     String
+  name         String
+  symbolPath   String
+  kind         String
+  parent       String?
+  isExported   Boolean
+  isAsync      Boolean
+  signature    String?
+  dependencies String   // Stringified JSON array
+  startLine    Int
+  endLine      Int
+  hash         String
+  content      String
+  embedding    String?  // Stringified JSON array of floats
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
