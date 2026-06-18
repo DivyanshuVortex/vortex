@@ -8,7 +8,7 @@ export async function searchCommand(options: any) {
   const { default: TerminalRenderer } = await import("marked-terminal");
 
   marked.setOptions({
-    renderer: new TerminalRenderer()
+    renderer: new TerminalRenderer() as any
   });
 
   const spinner = ora(`Searching codebase for: "${options.query}"...`).start();

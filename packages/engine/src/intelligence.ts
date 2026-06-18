@@ -1,9 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
-import { VectorStore, GeminiEmbedder } from "@vortex/retrieval";
+import { VectorStore, LocalEmbedder } from "@vortex/retrieval";
 
 export class IntelligenceAgent {
   private client: GoogleGenAI;
-  private embedder: GeminiEmbedder;
+  private embedder: LocalEmbedder;
   private store: VectorStore;
 
   constructor(apiKey?: string) {
@@ -12,7 +12,7 @@ export class IntelligenceAgent {
       throw new Error("GEMINI_API_KEY is not set.");
     }
     this.client = new GoogleGenAI({ apiKey: key });
-    this.embedder = new GeminiEmbedder(key);
+    this.embedder = new LocalEmbedder();
     this.store = new VectorStore();
   }
 
@@ -20,11 +20,11 @@ export class IntelligenceAgent {
     for (let i = 0; i < retries; i++) {
       try {
         const timeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error("API Request Timeout")), 30000)
+          setTimeout(() => reject(new Error("API Request Timeout")), 120000)
         );
         const response: any = await Promise.race([
           this.client.models.generateContent({
-            model: "gemini-flash-latest",
+            model: "gemini-2.5-flash",
             contents: prompt,
           }),
           timeoutPromise
@@ -44,19 +44,70 @@ export class IntelligenceAgent {
   }
 
   /**
-   * Generates a code review for a given PR diff.
+   * Extracts search queries (keywords, function names, classes) from a PR diff.
    */
-  async generateReview(diff: string): Promise<string> {
+  async extractSearchQueriesFromDiff(diff: string): Promise<string[]> {
     const prompt = `
-You are an expert senior software engineer reviewing a pull request.
-Analyze the following git diff and provide a constructive, thorough code review.
-Focus on logic errors, architectural flaws, security issues, and performance optimizations.
-Do not nitpick minor formatting if it's not a major issue.
+You are an expert code analyzer. 
+Analyze the following git diff and extract exactly 3 short search queries.
+These queries should be the names of the most important functions, classes, or architectural concepts that are modified or referenced in this PR.
+Your goal is to extract queries that can be used in a vector search engine to find the relevant codebase context.
+
+Return ONLY a valid JSON array of 3 strings. No markdown formatting, no explanation.
+
+Diff:
+\`\`\`diff
+${diff}
+\`\`\`
+    `;
+
+    try {
+      let result = await this.generateWithRetry(prompt);
+      if (result.startsWith("\`\`\`")) {
+        result = result.replace(/^\`\`\`[a-z]*\n/, "").replace(/\n\`\`\`$/, "");
+      }
+      const queries = JSON.parse(result);
+      if (Array.isArray(queries)) {
+        return queries;
+      }
+      return [];
+    } catch (err) {
+      console.warn("Failed to extract queries from diff:", err);
+      return [];
+    }
+  }
+
+  /**
+   * Generates a context-aware RAG code review for a given PR diff.
+   */
+  async generateRAGReview(diff: string, chunks: any[]): Promise<string> {
+    const contextStr = chunks.map((c, i) => {
+      return `[Context Chunk ${i+1}] File: ${c.file} | Symbol: ${c.symbolPath || 'N/A'}
+Code:
+${c.content}`;
+    }).join('\n\n---\n\n');
+
+    const prompt = `
+You are an expert Principal Software Engineer reviewing a pull request.
+You have been provided with the git diff of the pull request, AND some relevant code chunks from the existing codebase for context.
+
+Your task is to analyze the PR diff and compare it against the provided codebase context to determine if it is SAFE to merge.
+Focus on:
+1. Architectural consistency with the provided codebase context.
+2. Logic errors or integration issues.
+3. Does this break existing functionality shown in the chunks?
+
+At the end of your review, you MUST explicitly state whether the PR is "SAFE TO MERGE" or "REQUIRES CHANGES".
 
 Pull Request Diff:
 \`\`\`diff
 ${diff}
 \`\`\`
+
+Existing Codebase Context:
+${contextStr}
+
+Format your review beautifully with markdown.
     `;
 
     const result = await this.generateWithRetry(prompt);
@@ -131,6 +182,36 @@ ${fileContent}
     }
 
     return fixedCode;
+  }
+
+  /**
+   * Generates a basic code review for a PR diff without requiring context chunks.
+   */
+  async generateReview(diff: string): Promise<string> {
+    const prompt = `
+You are an expert Principal Software Engineer reviewing a pull request.
+You have been provided with the git diff of the pull request.
+
+Your task is to analyze the PR diff and provide a thorough code review.
+Focus on:
+1. Code quality and adherence to best practices
+2. Potential bugs or logic errors
+3. Performance implications
+4. Security considerations
+5. Design patterns and architecture
+
+At the end of your review, you MUST explicitly state whether the PR is "SAFE TO MERGE" or "REQUIRES CHANGES".
+
+Pull Request Diff:
+\`\`\`diff
+${diff}
+\`\`\`
+
+Format your review beautifully with markdown.
+    `;
+
+    const result = await this.generateWithRetry(prompt);
+    return result || "No review generated.";
   }
 
   /**

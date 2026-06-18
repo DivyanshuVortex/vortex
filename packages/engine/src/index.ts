@@ -1,13 +1,13 @@
 import { listTrackedFiles, isGitRepo, getGitRoot } from "@vortex/git";
-import { chunkFile, GeminiEmbedder, VectorStore } from "@vortex/retrieval";
+import { chunkFile, LocalEmbedder, VectorStore } from "@vortex/retrieval";
 import * as path from "path";
 
 export class Indexer {
-  private embedder: GeminiEmbedder;
+  private embedder: LocalEmbedder;
   private store: VectorStore;
 
   constructor() {
-    this.embedder = new GeminiEmbedder();
+    this.embedder = new LocalEmbedder();
     this.store = new VectorStore();
   }
 
@@ -72,13 +72,17 @@ export class Indexer {
         hash: ""
       }
     ]);
-    
+
     if (queryEmbedding.length === 0) {
         return [];
     }
-    
+
     console.log(`Searching vector store...`);
-    const results = await this.store.search(queryEmbedding[0], limit);
+    const embedding = queryEmbedding[0];
+    if (!embedding) {
+      return [];
+    }
+    const results = await this.store.search(embedding, limit);
     return results;
   }
 }

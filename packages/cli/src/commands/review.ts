@@ -1,4 +1,4 @@
-import { IntelligenceAgent } from "@vortex/engine";
+import { IntelligenceAgent, Indexer } from "@vortex/engine";
 import { createGithubClient } from "@vortex/github";
 
 export async function reviewCommand(options: any) {
@@ -9,7 +9,7 @@ export async function reviewCommand(options: any) {
   const { default: TerminalRenderer } = await import("marked-terminal");
 
   marked.setOptions({
-    renderer: new TerminalRenderer()
+    renderer: new TerminalRenderer() as any
   });
 
   console.log(chalk.blue(`\nReviewing PR #${options.pr}`));
@@ -34,9 +34,26 @@ export async function reviewCommand(options: any) {
     const github = createGithubClient(process.env.GITHUB_TOKEN);
     const diff = await github.fetchPullRequestDiff(owner, repo, options.pr);
 
-    spinner.text = "Analyzing diff with Vortex Intelligence...";
+    spinner.text = "Extracting architectural queries from diff...";
     const agent = new IntelligenceAgent();
-    const review = await agent.generateReview(diff);
+    const indexer = new Indexer();
+    
+    const queries = await agent.extractSearchQueriesFromDiff(diff);
+    
+    const allChunks: any[] = [];
+    if (queries.length > 0) {
+      spinner.text = `Retrieving local context for queries: ${queries.join(", ")}...`;
+      for (const query of queries) {
+        const results = await indexer.search(query, 2); // Get top 2 chunks per query
+        allChunks.push(...results);
+      }
+    }
+
+    // Deduplicate chunks by ID
+    const uniqueChunks = Array.from(new Map(allChunks.map(c => [c.id, c])).values());
+
+    spinner.text = `Analyzing diff against ${uniqueChunks.length} local chunks...`;
+    const review = await agent.generateRAGReview(diff, uniqueChunks);
 
     spinner.succeed("Review complete!\n");
 
@@ -52,6 +69,14 @@ export async function reviewCommand(options: any) {
     });
 
     console.log(formatted);
+
+    if (uniqueChunks.length > 0) {
+      console.log(chalk.cyan.dim(" 📚 Cross-Referenced Local Architecture:"));
+      uniqueChunks.forEach((res, i) => {
+         console.log(chalk.gray(`  │ [${i + 1}] ${res.file.replace(process.cwd(), '')} ➔ ${res.symbolPath || '(anonymous)'}`));
+      });
+    }
+
   } catch (err) {
     spinner.fail("Failed to review PR");
     console.error(err);

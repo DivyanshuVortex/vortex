@@ -1,5 +1,5 @@
 {
-  "name": "@vortex/cli",
+  "name": "vortex-ai-cli",
   "version": "0.1.0",
   "description": "Vortex CLI - The main entry point",
   "main": "./dist/index.js",
@@ -7,7 +7,7 @@
     "vortex": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm",
+    "build": "tsup src/index.ts --format cjs,esm --external @xenova/transformers",
     "dev": "tsx src/index.ts",
     "watch": "tsup src/index.ts --format cjs,esm --watch",
     "lint": "eslint .",
@@ -20,6 +20,7 @@
     "@vortex/github": "workspace:*",
     "@vortex/git": "workspace:*",
     "@vortex/shared": "workspace:*",
+    "@xenova/transformers": "^2.17.2",
     "boxen": "7",
     "chalk": "^5.6.2",
     "chokidar": "^5.0.0",

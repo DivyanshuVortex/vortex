@@ -1,4 +1,4 @@
-import { Octokit } from "octokit";
+import { Octokit } from "@octokit/rest";
 import { getPullRequestMetadata, getPullRequestDiff } from "./pull-requests/get-pr";
 import { createGithubClient } from "./client";
 import * as dotenv from "dotenv";
@@ -14,11 +14,11 @@ async function main() {
     throw new Error("Missing GITHUB_TOKEN in environment variables");
   }
 
-  const octokit = createGithubClient(token);
+  const githubClient = createGithubClient(token);
 
   try {
     const pr = await getPullRequestMetadata({
-      octokit,
+      octokit: githubClient.octokit,
       owner: "microcks",
       repo: "microcks-cli",
       pullNumber: 120,
@@ -33,7 +33,7 @@ async function main() {
 
     console.log("\n--- PR Diff ---");
     const diff = await getPullRequestDiff({
-      octokit,
+      octokit: githubClient.octokit,
       owner: "microcks",
       repo: "microcks-cli",
       pullNumber: 120,

@@ -7,9 +7,12 @@ import * as fs from "fs";
 import * as path from "path";
 import * as chokidar from "chokidar";
 import * as dotenv from "dotenv";
+import * as os from "os";
 
-// Load .env from the root of the monorepo
-dotenv.config({ path: path.resolve(process.cwd(), "../../.env") });
+// First load from current working directory
+dotenv.config({ path: path.resolve(process.cwd(), ".env") });
+// Then fallback to a global ~/.vortexenv file for global CLI usage
+dotenv.config({ path: path.resolve(os.homedir(), ".vortexenv") });
 
 import { initCommand } from "./commands/init";
 import { searchCommand } from "./commands/search";

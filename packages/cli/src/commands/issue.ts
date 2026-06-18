@@ -10,7 +10,7 @@ export async function issueCommand(options: any) {
   const { default: TerminalRenderer } = await import("marked-terminal");
 
   marked.setOptions({
-    renderer: new TerminalRenderer()
+    renderer: new TerminalRenderer() as any
   });
 
   console.log(chalk.blue(`\nAnalyzing Issue #${options.id}`));
