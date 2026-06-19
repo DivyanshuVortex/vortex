@@ -1,6 +1,6 @@
 import { Octokit } from "@octokit/rest";
-import { getPullRequestMetadata, getPullRequestDiff } from "./pull-requests/get-pr";
-import { createGithubClient } from "./client";
+import { getPullRequestMetadata, getPullRequestDiff } from "../src/pull-requests/get-pr";
+import { createGithubClient } from "../src/client";
 import * as dotenv from "dotenv";
 import path from "path";
 

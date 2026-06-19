@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { AgentInput, AgentOutput } from "./types";
 import { AgentTool } from "../tools/tool-types";
+import { generateWithRetry as sharedGenerateWithRetry } from "../llm";
 
 /**
  * BaseAgent — Abstract foundation for all Vortex agents.
@@ -181,43 +182,16 @@ When you are done analyzing (with or without tools), provide your final structur
 
   /**
    * Calls the Gemini API with exponential backoff retry.
-   * Extracted from the original IntelligenceAgent to share across all agents.
+   * Delegates to the shared utility in llm.ts.
    */
   protected async generateWithRetry(
     prompt: string,
     retries = 5
   ): Promise<string> {
-    for (let i = 0; i < retries; i++) {
-      try {
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("API Request Timeout")),
-            120000
-          )
-        );
-        const response: any = await Promise.race([
-          this.client.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-          }),
-          timeoutPromise,
-        ]);
-        return response.text || "";
-      } catch (err: any) {
-        if (err.status === 503 || err.status === 429) {
-          const delay = Math.pow(2, i) * 2000;
-          console.warn(
-            `\n[${this.name}] API Busy (${err.status}). Retrying in ${delay / 1000}s...`
-          );
-          await new Promise((res) => setTimeout(res, delay));
-        } else {
-          throw err;
-        }
-      }
-    }
-    throw new Error(
-      `[${this.name}] Failed to generate content after maximum retries.`
-    );
+    return sharedGenerateWithRetry(this.client, prompt, {
+      retries,
+      label: this.name,
+    });
   }
 
   /**

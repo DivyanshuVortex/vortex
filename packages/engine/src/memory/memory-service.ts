@@ -1,5 +1,6 @@
 import { prisma } from "@vortex/db";
 import { LocalEmbedder } from "@vortex/retrieval";
+import { cosineSimilarity, createQueryChunk } from "@vortex/shared";
 import { OrchestratedReview } from "../agents/types";
 
 /**
@@ -65,21 +66,7 @@ export class MemoryService {
     let embedding: string | undefined;
     try {
       const embeddings = await this.embedder.embedChunks([
-        {
-          content: memoryContent,
-          file: "",
-          startLine: 0,
-          endLine: 0,
-          symbolPath: "",
-          dependencies: [],
-          id: "memory",
-          language: "text",
-          name: "memory",
-          kind: "function" as const,
-          isExported: false,
-          isAsync: false,
-          hash: "",
-        },
+        createQueryChunk(memoryContent, "memory"),
       ]);
       if (embeddings[0]) {
         embedding = JSON.stringify(embeddings[0]);
@@ -113,21 +100,7 @@ export class MemoryService {
     let embedding: string | undefined;
     try {
       const embeddings = await this.embedder.embedChunks([
-        {
-          content,
-          file: "",
-          startLine: 0,
-          endLine: 0,
-          symbolPath: "",
-          dependencies: [],
-          id: "memory",
-          language: "text",
-          name: "memory",
-          kind: "function" as const,
-          isExported: false,
-          isAsync: false,
-          hash: "",
-        },
+        createQueryChunk(content, "memory"),
       ]);
       if (embeddings[0]) {
         embedding = JSON.stringify(embeddings[0]);
@@ -157,21 +130,7 @@ export class MemoryService {
     let queryEmbedding: number[] | null = null;
     try {
       const embeddings = await this.embedder.embedChunks([
-        {
-          content: query,
-          file: "",
-          startLine: 0,
-          endLine: 0,
-          symbolPath: "",
-          dependencies: [],
-          id: "query",
-          language: "text",
-          name: "query",
-          kind: "function" as const,
-          isExported: false,
-          isAsync: false,
-          hash: "",
-        },
+        createQueryChunk(query),
       ]);
       queryEmbedding = embeddings[0] ?? null;
     } catch {
@@ -197,7 +156,7 @@ export class MemoryService {
           if (mem.embedding) {
             try {
               const memEmbedding = JSON.parse(mem.embedding) as number[];
-              similarity = this.cosineSimilarity(queryEmbedding!, memEmbedding);
+              similarity = cosineSimilarity(queryEmbedding!, memEmbedding);
             } catch {
               // Invalid embedding
             }
@@ -292,19 +251,5 @@ export class MemoryService {
     return tags;
   }
 
-  /**
-   * Computes cosine similarity between two vectors.
-   */
-  private cosineSimilarity(a: number[], b: number[]): number {
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
-    for (let i = 0; i < a.length; i++) {
-      dotProduct += (a[i] as number) * (b[i] as number);
-      normA += (a[i] as number) * (a[i] as number);
-      normB += (b[i] as number) * (b[i] as number);
-    }
-    if (normA === 0 || normB === 0) return 0;
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-  }
+  // cosineSimilarity is now imported from @vortex/shared
 }

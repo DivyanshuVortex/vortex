@@ -1,5 +1,6 @@
 import { listTrackedFiles, isGitRepo, getGitRoot } from "@vortex/git";
 import { chunkFile, LocalEmbedder, VectorStore, BM25Index, HybridRetriever } from "@vortex/retrieval";
+import { createQueryChunk } from "@vortex/shared";
 import * as path from "path";
 import * as fs from "fs";
 import { initDatabase } from "@vortex/db";
@@ -90,21 +91,7 @@ export class Indexer {
     await initDatabase();
     // Create a dummy chunk to embed the query
     const queryEmbedding = await this.embedder.embedChunks([
-      { 
-        content: query, 
-        file: "", 
-        startLine: 0, 
-        endLine: 0, 
-        symbolPath: "",
-        dependencies: [],
-        id: "query",
-        language: "text",
-        name: "query",
-        kind: "function",
-        isExported: false,
-        isAsync: false,
-        hash: ""
-      }
+      createQueryChunk(query),
     ]);
 
     if (queryEmbedding.length === 0) {
@@ -158,6 +145,7 @@ export class Indexer {
 }
 
 export * from "./intelligence";
+export * from "./llm";
 export * from "./agents/types";
 export * from "./agents/base-agent";
 export * from "./agents/security-agent";

@@ -1,22 +1,10 @@
 import { prisma } from "@vortex/db";
+import { cosineSimilarity } from "@vortex/shared";
 import { Chunk, ChunkKind } from "./chunker";
 
 export interface SearchFilter {
   file?: string;
   kind?: ChunkKind;
-}
-
-function cosineSimilarity(vecA: number[], vecB: number[]): number {
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-  for (let i = 0; i < vecA.length; i++) {
-    dotProduct += (vecA[i] as number) * (vecB[i] as number);
-    normA += (vecA[i] as number) * (vecA[i] as number);
-    normB += (vecB[i] as number) * (vecB[i] as number);
-  }
-  if (normA === 0 || normB === 0) return 0;
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
 export class VectorStore {

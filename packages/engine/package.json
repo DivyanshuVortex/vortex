@@ -13,8 +13,8 @@
     "@google/genai": "^2.5.0",
     "@vortex/db": "workspace:*",
     "@vortex/git": "workspace:*",
-    "@vortex/github": "workspace:*",
     "@vortex/retrieval": "workspace:*",
+    "@vortex/shared": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

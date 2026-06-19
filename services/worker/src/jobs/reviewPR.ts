@@ -1,4 +1,4 @@
-import { IntelligenceAgent } from '@vortex/engine';
+import { IntelligenceAgent, Indexer } from '@vortex/engine';
 import { createGithubClient } from '@vortex/github';
 import { Job } from 'bullmq';
 
@@ -18,20 +18,39 @@ export default async function handleReviewPR(job: Job<ReviewPRJobData>) {
 
   const github = createGithubClient(process.env.GITHUB_TOKEN);
   const agent = new IntelligenceAgent();
+  const indexer = new Indexer();
 
   try {
     // 1. Fetch the diff
     console.log(`[ReviewPR] Fetching diff for PR #${prNumber}...`);
     const diff = await github.fetchPullRequestDiff(owner, repo, prNumber);
 
-    // 2. Generate the review
-    console.log(`[ReviewPR] Generating AI review...`);
-    const review = await agent.generateReview(diff);
+    // 2. Extract search queries and run hybrid search for context
+    console.log(`[ReviewPR] Extracting architectural queries from diff...`);
+    const queries = await agent.extractSearchQueriesFromDiff(diff);
 
-    // 3. Optional: Post the review back to GitHub (Not implemented yet, just logging)
-    // await github.postPullRequestReview(owner, repo, prNumber, review);
+    const allChunks: any[] = [];
+    if (queries.length > 0) {
+      console.log(`[ReviewPR] Hybrid searching for: ${queries.join(", ")}...`);
+      for (const query of queries) {
+        const results = await indexer.hybridSearch(query, 3);
+        allChunks.push(...results);
+      }
+    }
+
+    // Deduplicate chunks by ID
+    const uniqueChunks = Array.from(
+      new Map(allChunks.map((c) => [c.id, c])).values()
+    );
+
+    // 3. Generate multi-agent review (Security + Architecture + Synthesis)
+    console.log(`[ReviewPR] Running multi-agent review...`);
+    const review = await agent.generateMultiAgentReview(diff, uniqueChunks);
+
+    // 4. TODO: Post the review back to GitHub
+    // await github.submitPullRequestReview(owner, repo, prNumber, review.markdownReport);
     
-    console.log(`[ReviewPR] Successfully generated review for PR #${prNumber}`);
+    console.log(`[ReviewPR] Successfully reviewed PR #${prNumber} — Verdict: ${review.verdict}`);
     
     return review; // Result is stored in BullMQ
   } catch (err) {

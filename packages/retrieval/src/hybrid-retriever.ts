@@ -3,6 +3,7 @@ import { VectorStore } from "./store";
 import { BM25Index } from "./bm25";
 import { CrossEncoderReranker, ScoredChunk } from "./reranker";
 import { LocalEmbedder } from "./embedder";
+import { createQueryChunk } from "@vortex/shared";
 
 /**
  * Configuration for the hybrid retrieval pipeline.
@@ -153,21 +154,7 @@ export class HybridRetriever {
     try {
       // Embed the query
       const queryEmbeddings = await this.embedder.embedChunks([
-        {
-          content: query,
-          file: "",
-          startLine: 0,
-          endLine: 0,
-          symbolPath: "",
-          dependencies: [],
-          id: "query",
-          language: "text",
-          name: "query",
-          kind: "function",
-          isExported: false,
-          isAsync: false,
-          hash: "",
-        },
+        createQueryChunk(query),
       ]);
 
       if (queryEmbeddings.length === 0 || !queryEmbeddings[0]) return [];

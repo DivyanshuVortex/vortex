@@ -1,5 +1,5 @@
-import { scanFiles } from "./src/scanner";
-import { chunkFile } from "./src/chunker";
+import { scanFiles } from "../src/scanner";
+import { chunkFile } from "../src/chunker";
 import * as path from "path";
 
 async function main() {

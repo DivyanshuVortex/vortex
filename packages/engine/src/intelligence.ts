@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { VectorStore, LocalEmbedder, BM25Index, HybridRetriever } from "@vortex/retrieval";
 import { ReviewOrchestrator } from "./agents/orchestrator";
 import { OrchestratedReview, AgentContextChunk } from "./agents/types";
+import { generateWithRetry } from "./llm";
 
 export class IntelligenceAgent {
   private client: GoogleGenAI;
@@ -20,31 +21,8 @@ export class IntelligenceAgent {
     this.orchestrator = new ReviewOrchestrator(key);
   }
 
-  private async generateWithRetry(prompt: string, retries = 5): Promise<string> {
-    for (let i = 0; i < retries; i++) {
-      try {
-        const timeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error("API Request Timeout")), 120000)
-        );
-        const response: any = await Promise.race([
-          this.client.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-          }),
-          timeoutPromise
-        ]);
-        return response.text || "";
-      } catch (err: any) {
-        if (err.status === 503 || err.status === 429) {
-          const delay = Math.pow(2, i) * 2000;
-          console.warn(`\n[API Busy] Error ${err.status}: ${err.message}. Retrying in ${delay / 1000} seconds...`);
-          await new Promise(res => setTimeout(res, delay));
-        } else {
-          throw err;
-        }
-      }
-    }
-    throw new Error("Failed to generate content after maximum retries.");
+  private async callLLM(prompt: string): Promise<string> {
+    return generateWithRetry(this.client, prompt, { label: "IntelligenceAgent" });
   }
 
   /**
@@ -66,7 +44,7 @@ ${diff}
     `;
 
     try {
-      let result = await this.generateWithRetry(prompt);
+      let result = await this.callLLM(prompt);
       if (result.startsWith("\`\`\`")) {
         result = result.replace(/^\`\`\`[a-z]*\n/, "").replace(/\n\`\`\`$/, "");
       }
@@ -114,7 +92,7 @@ ${contextStr}
 Format your review beautifully with markdown.
     `;
 
-    const result = await this.generateWithRetry(prompt);
+    const result = await this.callLLM(prompt);
     return result || "No review generated.";
   }
 
@@ -138,7 +116,7 @@ ${relevantContext.map((c, i) => `--- Chunk ${i + 1} (${c.file} - ${c.symbolPath 
 
 Use heavy markdown formatting (bolding, lists, code blocks with syntax highlighting) and emojis to make your analysis highly readable. Focus on being deeply technical and actionable.
 `;
-    return this.generateWithRetry(prompt);
+    return this.callLLM(prompt);
   }
 
   /**
@@ -158,7 +136,7 @@ ${fileContent}
 \`\`\`
     `;
 
-    const result = await this.generateWithRetry(prompt);
+    const result = await this.callLLM(prompt);
     return result || "No suggestions generated.";
   }
 
@@ -177,7 +155,7 @@ ${fileContent}
 \`\`\`
     `;
 
-    let fixedCode = await this.generateWithRetry(prompt);
+    let fixedCode = await this.callLLM(prompt);
     if (!fixedCode) return fileContent;
     
     // Strip markdown formatting if the model still outputs it
@@ -214,7 +192,7 @@ ${diff}
 Format your review beautifully with markdown.
     `;
 
-    const result = await this.generateWithRetry(prompt);
+    const result = await this.callLLM(prompt);
     return result || "No review generated.";
   }
 
@@ -249,7 +227,7 @@ Your answer must follow these strict guidelines:
 5. If the provided chunks do not contain enough information to answer fully, explicitly state what is missing.
 `;
 
-    return await this.generateWithRetry(prompt);
+    return await this.callLLM(prompt);
   }
 
   /**
