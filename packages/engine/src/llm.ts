@@ -43,7 +43,7 @@ export async function generateWithRetry(
       if (err.status === 503 || err.status === 429) {
         const delay = Math.pow(2, i) * 2000;
         console.warn(
-          `\n[${label}] API Busy (${err.status}). Retrying in ${delay / 1000}s...`
+          `\n[${label}] API Busy (${err.status}): ${err.message}\nRetrying in ${delay / 1000}s...`
         );
         await new Promise((res) => setTimeout(res, delay));
       } else {

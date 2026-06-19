@@ -5,9 +5,19 @@ import * as path from "path";
 import * as dotenv from "dotenv";
 import * as os from "os";
 
-// Load environment variables: local .env first, then global ~/.vortexenv fallback
-dotenv.config({ path: path.resolve(process.cwd(), ".env") });
+// Load environment variables manually to ensure strict precedence
+// 1. Global fallback
 dotenv.config({ path: path.resolve(os.homedir(), ".vortexenv") });
+
+// 2. Explicit local override (bypasses tsx/dotenv auto-load conflicts)
+// The .env file is located at the monorepo root, which is 2 levels up from packages/cli
+const localEnvPath = path.resolve(__dirname, "../../../.env");
+if (require("fs").existsSync(localEnvPath)) {
+  const envConfig = dotenv.parse(require("fs").readFileSync(localEnvPath));
+  for (const k in envConfig) {
+    process.env[k] = envConfig[k];
+  }
+}
 
 import { initCommand } from "./commands/init";
 import { searchCommand } from "./commands/search";
