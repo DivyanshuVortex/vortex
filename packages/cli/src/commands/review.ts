@@ -19,7 +19,11 @@ export async function reviewCommand(options: any) {
     renderer: new TerminalRenderer() as any,
   });
 
-  console.log(chalk.blue.bold(`\n🌀 Multi-Agent Review for PR #${options.pr}\n`));
+  if (options.pr) {
+    console.log(chalk.blue.bold(`\n🌀 Multi-Agent Review for PR #${options.pr}\n`));
+  } else {
+    console.log(chalk.blue.bold(`\n🌀 Multi-Agent Review for Local Changes\n`));
+  }
 
   if (!process.env.GITHUB_TOKEN) {
     console.log(
@@ -46,13 +50,23 @@ export async function reviewCommand(options: any) {
   }
 
   const spinner = ora(
-    `Fetching diff for ${owner}/${repo}#${options.pr}...`
+    options.pr ? `Fetching diff for ${owner}/${repo}#${options.pr}...` : `Fetching local git diff...`
   ).start();
 
   try {
-    // ── Step 1: Fetch PR Diff ──
-    const github = createGithubClient(process.env.GITHUB_TOKEN);
-    const diff = await github.fetchPullRequestDiff(owner, repo, options.pr);
+    // ── Step 1: Fetch Diff ──
+    let diff: string;
+    if (options.pr) {
+      const github = createGithubClient(process.env.GITHUB_TOKEN);
+      diff = await github.fetchPullRequestDiff(owner, repo, options.pr);
+    } else {
+      const { execSync } = await import("child_process");
+      diff = execSync("git diff HEAD").toString();
+      if (!diff.trim()) {
+        spinner.fail("No local changes found to review. Make some changes or specify a --pr.");
+        return;
+      }
+    }
 
     // ── Step 2: Extract Queries & Run Hybrid Search ──
     spinner.text = "Extracting architectural queries from diff...";
@@ -192,10 +206,12 @@ export async function reviewCommand(options: any) {
     }
 
     // ── Step 5: Store Review in Memory ──
-    try {
-      await memoryService.storeReviewMemory(options.pr, owner, repo, review);
-    } catch (err) {
-      console.warn(chalk.yellow("\n⚠️ Failed to store review in memory:"), err);
+    if (options.pr) {
+      try {
+        await memoryService.storeReviewMemory(options.pr, owner, repo, review);
+      } catch (err) {
+        console.warn(chalk.yellow("\n⚠️ Failed to store review in memory:"), err);
+      }
     }
 
     console.log("");

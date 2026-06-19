@@ -43,7 +43,7 @@ program
 program
   .command("review")
   .description("Review your changes using repository intelligence and historical PR patterns")
-  .requiredOption("--pr <number>", "Pull request number", Number)
+  .option("--pr <number>", "Pull request number", Number)
   .option("--files <paths>", "Comma-separated list of target files")
   .option("--deep", "Enable deep review analysis")
   .action(reviewCommand);
