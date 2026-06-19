@@ -10,12 +10,18 @@ import * as os from "os";
 dotenv.config({ path: path.resolve(os.homedir(), ".vortexenv") });
 
 // 2. Explicit local override (bypasses tsx/dotenv auto-load conflicts)
-// The .env file is located at the monorepo root, which is 2 levels up from packages/cli
-const localEnvPath = path.resolve(__dirname, "../../../.env");
-if (require("fs").existsSync(localEnvPath)) {
-  const envConfig = dotenv.parse(require("fs").readFileSync(localEnvPath));
-  for (const k in envConfig) {
-    process.env[k] = envConfig[k];
+// The .env file might be at the monorepo root (relative to __dirname) OR in the current working directory.
+const localEnvPaths = [
+  path.resolve(__dirname, "../../../.env"),
+  path.resolve(process.cwd(), ".env"),
+];
+
+for (const envPath of localEnvPaths) {
+  if (require("fs").existsSync(envPath)) {
+    const envConfig = dotenv.parse(require("fs").readFileSync(envPath));
+    for (const k in envConfig) {
+      process.env[k] = envConfig[k];
+    }
   }
 }
 
@@ -28,6 +34,7 @@ import { suggestCommand } from "./commands/suggest";
 import { fixNitbitsCommand } from "./commands/fix-nitbits";
 import { analyzeCommand } from "./commands/analyze";
 import { watchCommand } from "./commands/watch";
+import { solveCommand } from "./commands/solve";
 
 const program = new Command();
 
@@ -70,6 +77,12 @@ program
   .option("--file <path>", "Filter graph to only include dependencies for a specific file")
   .option("--detailed", "Include individual functions and classes in the graph instead of just files")
   .action(graphCommand);
+
+program
+  .command("solve")
+  .description("Autonomously solve a task by writing code and executing commands")
+  .argument("<prompt>", "The task you want the autonomous agent to solve")
+  .action(solveCommand);
 
 // ── AI-Powered Commands ──
 

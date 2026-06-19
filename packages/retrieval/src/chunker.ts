@@ -522,5 +522,27 @@ export function chunkFile(
 
   visit(sourceFile);
 
+  // Fallback: If no chunks were created (e.g., non-TS/JS files like CSS/HTML),
+  // chunk the entire file as a single chunk.
+  if (chunks.length === 0 && source.trim().length > 0) {
+    const filename = path.basename(filePath);
+    const hash = getHash(source);
+    chunks.push({
+      id: `${filename}:${hash.slice(0, 12)}`,
+      file: filePath,
+      language: getLanguage(filePath),
+      name: filename,
+      symbolPath: filename,
+      kind: "function" as ChunkKind, // Using a known kind from the enum
+      isExported: false,
+      isAsync: false,
+      dependencies: [],
+      startLine: 1,
+      endLine: source.split('\n').length,
+      hash: hash,
+      content: source,
+    });
+  }
+
   return chunks;
 }

@@ -43,7 +43,7 @@ export class Indexer {
       try {
         console.log(`Processing ${file}...`);
         const chunks = chunkFile(file);
-        
+
         if (chunks.length === 0) {
           continue;
         }
@@ -95,7 +95,7 @@ export class Indexer {
     ]);
 
     if (queryEmbedding.length === 0) {
-        return [];
+      return [];
     }
 
     console.log(`Searching vector store...`);
@@ -152,9 +152,12 @@ export * from "./agents/security-agent";
 export * from "./agents/architecture-agent";
 export * from "./agents/synthesizer-agent";
 export * from "./agents/orchestrator";
+export * from "./agents/autonomous-agent";
 export * from "./memory/memory-service";
 export * from "./tools/tool-types";
 export * from "./tools/grep-tool";
 export * from "./tools/typecheck-tool";
 export * from "./tools/file-read-tool";
-
+export * from "./tools/file-write-tool";
+export * from "./tools/shell-execute-tool";
+export * from "./tools/rag-search-tool";

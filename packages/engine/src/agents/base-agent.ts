@@ -25,7 +25,7 @@ export abstract class BaseAgent {
   protected tools: AgentTool[] = [];
 
   /** Maximum tool-calling iterations in the ReAct loop */
-  private maxToolIterations = 3;
+  protected maxToolIterations = 3;
 
   constructor(apiKey?: string) {
     const key = apiKey || process.env.GEMINI_API_KEY;
@@ -46,14 +46,17 @@ export abstract class BaseAgent {
    * Main execution entry point.
    * Runs the agent with optional ReAct-style tool calling.
    */
-  public async run(input: AgentInput): Promise<AgentOutput> {
+  public async run(
+    input: AgentInput,
+    options?: { onToolCall?: (toolName: string, args: Record<string, string>) => void }
+  ): Promise<AgentOutput> {
     const prompt = this.buildPrompt(input);
     let fullPrompt = `${this.systemPrompt}\n\n${prompt}`;
 
     // If tools are registered, add tool descriptions and enter ReAct loop
     if (this.tools.length > 0) {
       fullPrompt += this.buildToolSection();
-      const rawOutput = await this.reactLoop(fullPrompt);
+      const rawOutput = await this.reactLoop(fullPrompt, options);
       return this.parseOutput(rawOutput);
     }
 
@@ -82,7 +85,10 @@ export abstract class BaseAgent {
    * 3. Append tool result to context and re-prompt
    * 4. Repeat until LLM gives FINAL_ANSWER or max iterations reached
    */
-  private async reactLoop(prompt: string): Promise<string> {
+  private async reactLoop(
+    prompt: string,
+    options?: { onToolCall?: (toolName: string, args: Record<string, string>) => void }
+  ): Promise<string> {
     let currentPrompt = prompt;
     let iterations = 0;
 
@@ -98,6 +104,10 @@ export abstract class BaseAgent {
       }
 
       // Execute the tool
+      if (options?.onToolCall) {
+        options.onToolCall(toolCall.name, toolCall.args);
+      }
+      
       const tool = this.tools.find((t) => t.name === toolCall.name);
       if (!tool) {
         // Tool not found — treat remaining response as final answer
@@ -135,9 +145,48 @@ export abstract class BaseAgent {
   private extractToolCall(
     response: string
   ): { name: string; args: Record<string, string> } | null {
-    // Look for TOOL_CALL JSON blocks
+    // 1. Try to extract from a markdown code block
+    const jsonBlockMatch = response.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+    let cleaned = (jsonBlockMatch && jsonBlockMatch[1]) ? jsonBlockMatch[1] : response;
+
+    // 2. Wrap in array and parse if multiple objects exist (e.g. {}{})
+    // This handles the case where the LLM outputs multiple tool calls separated by whitespace/newlines
+    const arrayWrapped = `[${cleaned.replace(/\}\s*\{/g, '},{')}]`;
+    try {
+      const parsedArray = JSON.parse(arrayWrapped);
+      if (Array.isArray(parsedArray)) {
+        for (const item of parsedArray) {
+          if (item && item.tool_call && item.tool_call.name) {
+            return {
+              name: item.tool_call.name,
+              args: item.tool_call.args || {},
+            };
+          }
+        }
+      }
+    } catch {
+      // Fallthrough
+    }
+
+    // 3. Try to find any single JSON object containing "tool_call"
+    const objectMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (objectMatch) {
+      try {
+        const parsed = JSON.parse(objectMatch[0]);
+        if (parsed && parsed.tool_call && parsed.tool_call.name) {
+          return {
+            name: parsed.tool_call.name,
+            args: parsed.tool_call.args || {},
+          };
+        }
+      } catch {
+        // Fallthrough
+      }
+    }
+
+    // 4. Fallback regex if it's malformed but close
     const toolCallMatch = response.match(
-      /\{"tool_call"\s*:\s*\{[^}]*"name"\s*:\s*"([^"]+)"[^}]*\}\s*\}/
+      /\{"tool_call"\s*:\s*\{[\s\S]*?"name"\s*:\s*"([^"]+)"[\s\S]*\}\s*\}/
     );
 
     if (!toolCallMatch) return null;
@@ -173,6 +222,8 @@ You have access to the following tools to verify your analysis. To use a tool, i
 \`\`\`json
 {"tool_call": {"name": "tool_name", "args": {"arg1": "value1"}}}
 \`\`\`
+
+IMPORTANT: You may only call ONE tool per response. Do not output multiple tool calls at once.
 
 ${toolDescriptions}
 
