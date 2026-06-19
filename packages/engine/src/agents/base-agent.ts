@@ -237,7 +237,7 @@ When you are done analyzing (with or without tools), provide your final structur
    */
   protected async generateWithRetry(
     prompt: string,
-    retries = 5
+    retries = 3
   ): Promise<string> {
     return sharedGenerateWithRetry(this.client, prompt, {
       retries,
