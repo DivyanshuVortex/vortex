@@ -1,10 +1,13 @@
 import { GoogleGenAI } from "@google/genai";
-import { VectorStore, LocalEmbedder } from "@vortex/retrieval";
+import { VectorStore, LocalEmbedder, BM25Index, HybridRetriever } from "@vortex/retrieval";
+import { ReviewOrchestrator } from "./agents/orchestrator";
+import { OrchestratedReview, AgentContextChunk } from "./agents/types";
 
 export class IntelligenceAgent {
   private client: GoogleGenAI;
   private embedder: LocalEmbedder;
   private store: VectorStore;
+  private orchestrator: ReviewOrchestrator;
 
   constructor(apiKey?: string) {
     const key = apiKey || process.env.GEMINI_API_KEY;
@@ -14,6 +17,7 @@ export class IntelligenceAgent {
     this.client = new GoogleGenAI({ apiKey: key });
     this.embedder = new LocalEmbedder();
     this.store = new VectorStore();
+    this.orchestrator = new ReviewOrchestrator(key);
   }
 
   private async generateWithRetry(prompt: string, retries = 5): Promise<string> {
@@ -246,5 +250,33 @@ Your answer must follow these strict guidelines:
 `;
 
     return await this.generateWithRetry(prompt);
+  }
+
+  /**
+   * Generates a multi-agent code review using the ReviewOrchestrator.
+   *
+   * This is the upgraded version of generateRAGReview that uses:
+   * - SecurityAgent: Scans for vulnerabilities
+   * - ArchitectureAgent: Checks pattern consistency
+   * - SynthesizerAgent: Combines findings into final verdict
+   *
+   * @param diff - The raw PR diff
+   * @param chunks - Relevant codebase chunks from hybrid retrieval
+   * @param memories - Optional relevant memories from past reviews
+   * @returns Full OrchestratedReview with individual agent outputs
+   */
+  async generateMultiAgentReview(
+    diff: string,
+    chunks: any[],
+    memories?: string[]
+  ): Promise<OrchestratedReview> {
+    const contextChunks: AgentContextChunk[] = chunks.map((c) => ({
+      file: c.file,
+      symbolPath: c.symbolPath || "anonymous",
+      content: c.content,
+      kind: c.kind || "unknown",
+    }));
+
+    return this.orchestrator.runReview(diff, contextChunks, memories);
   }
 }

@@ -26,6 +26,24 @@ importers:
       '@types/marked-terminal':
         specifier: ^6.1.1
         version: 6.1.1
+      '@vortex/db':
+        specifier: workspace:*
+        version: link:../db
+      '@vortex/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@vortex/git':
+        specifier: workspace:*
+        version: link:../git
+      '@vortex/github':
+        specifier: workspace:*
+        version: link:../github
+      '@vortex/retrieval':
+        specifier: workspace:*
+        version: link:../retrieval
+      '@vortex/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@xenova/transformers':
         specifier: ^2.17.2
         version: 2.17.2
@@ -60,18 +78,6 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
-      '@vortex/engine':
-        specifier: workspace:*
-        version: link:../engine
-      '@vortex/git':
-        specifier: workspace:*
-        version: link:../git
-      '@vortex/github':
-        specifier: workspace:*
-        version: link:../github
-      '@vortex/shared':
-        specifier: workspace:*
-        version: link:../shared
       '@vortex/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
@@ -124,6 +130,9 @@ importers:
       '@vortex/retrieval':
         specifier: workspace:*
         version: link:../retrieval
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@vortex/typescript-config':
         specifier: workspace:*
@@ -222,6 +231,9 @@ importers:
       ignore:
         specifier: ^7.0.5
         version: 7.0.5
+      minisearch:
+        specifier: ^7.2.0
+        version: 7.2.0
       typescript:
         specifier: 5.9.2
         version: 5.9.2
@@ -2212,6 +2224,9 @@ packages:
 
   minimist@1.2.8:
     resolution: {integrity: sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==}
+
+  minisearch@7.2.0:
+    resolution: {integrity: sha512-dqT2XBYUOZOiC5t2HRnwADjhNS2cecp9u+TJRiJ1Qp/f5qjkeT5APcGPjHw+bz89Ms8Jp+cG4AlE+QZ/QnDglg==}
 
   mkdirp-classic@0.5.3:
     resolution: {integrity: sha512-gKLcREMhtuZRwRAfqP3RFW+TK4JqApVBtOIftVgjuABpAtpxhPGaDcfvbhNvD0B8iD1oUr/txX35NjcaY6Ns/A==}
@@ -4868,6 +4883,8 @@ snapshots:
       brace-expansion: 1.1.14
 
   minimist@1.2.8: {}
+
+  minisearch@7.2.0: {}
 
   mkdirp-classic@0.5.3: {}
 

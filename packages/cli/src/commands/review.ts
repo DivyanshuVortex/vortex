@@ -1,4 +1,11 @@
-import { IntelligenceAgent, Indexer } from "@vortex/engine";
+import {
+  IntelligenceAgent,
+  Indexer,
+  MemoryService,
+  ToolRegistry,
+  GrepTool,
+  FileReadTool,
+} from "@vortex/engine";
 import { createGithubClient } from "@vortex/github";
 
 export async function reviewCommand(options: any) {
@@ -9,74 +16,189 @@ export async function reviewCommand(options: any) {
   const { default: TerminalRenderer } = await import("marked-terminal");
 
   marked.setOptions({
-    renderer: new TerminalRenderer() as any
+    renderer: new TerminalRenderer() as any,
   });
 
-  console.log(chalk.blue(`\nReviewing PR #${options.pr}`));
+  console.log(chalk.blue.bold(`\n🌀 Multi-Agent Review for PR #${options.pr}\n`));
 
   if (!process.env.GITHUB_TOKEN) {
-    console.log(chalk.yellow("⚠️ No GITHUB_TOKEN found. Using anonymous access (subject to rate limits)."));
+    console.log(
+      chalk.yellow(
+        "⚠️ No GITHUB_TOKEN found. Using anonymous access (subject to rate limits)."
+      )
+    );
   }
 
-  const repoInfo = await import("@vortex/git").then(m => m.getGithubRepoInfo(process.cwd()));
-  
+  const repoInfo = await import("@vortex/git").then((m) =>
+    m.getGithubRepoInfo(process.cwd())
+  );
+
   const owner = process.env.GITHUB_OWNER || repoInfo?.owner;
   const repo = process.env.GITHUB_REPO || repoInfo?.repo;
 
   if (!owner || !repo) {
-    console.error(chalk.red("Could not determine GitHub repository. Please run this command inside a git repository or set GITHUB_OWNER and GITHUB_REPO."));
+    console.error(
+      chalk.red(
+        "Could not determine GitHub repository. Please run this command inside a git repository or set GITHUB_OWNER and GITHUB_REPO."
+      )
+    );
     return;
   }
 
-  const spinner = ora(`Fetching diff for ${owner}/${repo}#${options.pr}...`).start();
+  const spinner = ora(
+    `Fetching diff for ${owner}/${repo}#${options.pr}...`
+  ).start();
 
   try {
+    // ── Step 1: Fetch PR Diff ──
     const github = createGithubClient(process.env.GITHUB_TOKEN);
     const diff = await github.fetchPullRequestDiff(owner, repo, options.pr);
 
+    // ── Step 2: Extract Queries & Run Hybrid Search ──
     spinner.text = "Extracting architectural queries from diff...";
     const agent = new IntelligenceAgent();
     const indexer = new Indexer();
-    
+
     const queries = await agent.extractSearchQueriesFromDiff(diff);
-    
+
     const allChunks: any[] = [];
     if (queries.length > 0) {
-      spinner.text = `Retrieving local context for queries: ${queries.join(", ")}...`;
+      spinner.text = `Hybrid searching for: ${queries.join(", ")}...`;
       for (const query of queries) {
-        const results = await indexer.search(query, 2); // Get top 2 chunks per query
+        const results = await indexer.hybridSearch(query, 3);
         allChunks.push(...results);
       }
     }
 
     // Deduplicate chunks by ID
-    const uniqueChunks = Array.from(new Map(allChunks.map(c => [c.id, c])).values());
+    const uniqueChunks = Array.from(
+      new Map(allChunks.map((c) => [c.id, c])).values()
+    );
 
-    spinner.text = `Analyzing diff against ${uniqueChunks.length} local chunks...`;
-    const review = await agent.generateRAGReview(diff, uniqueChunks);
+    // ── Step 3: Recall Relevant Memories ──
+    spinner.text = "Checking memory for relevant past reviews...";
+    const memoryService = new MemoryService();
+    const memories = await memoryService.recallRelevantMemories(
+      `PR review ${queries.join(" ")}`,
+      3
+    );
 
-    spinner.succeed("Review complete!\n");
+    // ── Step 4: Run Multi-Agent Review ──
+    spinner.text = `Running multi-agent review (Security + Architecture + Synthesis)...`;
+    const review = await agent.generateMultiAgentReview(
+      diff,
+      uniqueChunks,
+      memories
+    );
 
-    const parsedReview = await marked.parse(review);
+    spinner.succeed(
+      chalk.green(
+        `Review complete in ${(review.durationMs / 1000).toFixed(1)}s!\n`
+      )
+    );
+
+    // ── Display Results ──
+
+    // Main review report
+    const parsedReview = await marked.parse(review.markdownReport);
+
+    const verdictColor =
+      review.verdict === "SAFE_TO_MERGE"
+        ? chalk.green
+        : review.verdict === "REQUIRES_CHANGES"
+          ? chalk.red
+          : chalk.yellow;
+
+    const borderColor =
+      review.verdict === "SAFE_TO_MERGE"
+        ? "green"
+        : review.verdict === "REQUIRES_CHANGES"
+          ? "red"
+          : "yellow";
 
     const formatted = boxen(parsedReview.trim(), {
       padding: { top: 1, bottom: 1, left: 2, right: 2 },
       margin: { top: 1, bottom: 1 },
-      borderStyle: 'double',
-      borderColor: 'magenta',
-      title: chalk.magenta.bold(' ✨ AI Code Review '),
-      titleAlignment: 'center'
+      borderStyle: "double",
+      borderColor: borderColor as any,
+      title: chalk.bold(` ✨ Multi-Agent Code Review `),
+      titleAlignment: "center",
     });
 
     console.log(formatted);
 
+    // Verdict banner
+    console.log(
+      boxen(verdictColor.bold(`  ${review.verdict}  `), {
+        padding: { left: 2, right: 2 },
+        borderStyle: "round",
+        borderColor: borderColor as any,
+        textAlignment: "center",
+      })
+    );
+
+    // Agent summary cards
+    const { security, architecture } = review.agentOutputs;
+
+    console.log(
+      chalk.dim(
+        `\n 🛡️  Security: ${security.riskLevel} (${security.findings.length} findings)`
+      )
+    );
+    security.findings.forEach((f: any, i: number) => {
+      const severityColor =
+        f.severity === "critical" || f.severity === "high"
+          ? chalk.red
+          : f.severity === "medium"
+            ? chalk.yellow
+            : chalk.gray;
+      console.log(severityColor(`    [${f.severity.toUpperCase()}] ${f.title}`));
+    });
+
+    console.log(
+      chalk.dim(
+        `\n 🏗️  Architecture: ${architecture.consistencyScore} (${architecture.findings.length} findings)`
+      )
+    );
+    architecture.findings.forEach((f: any, i: number) => {
+      const severityColor =
+        f.severity === "breaking"
+          ? chalk.red
+          : f.severity === "major"
+            ? chalk.yellow
+            : chalk.gray;
+      console.log(severityColor(`    [${f.severity.toUpperCase()}] ${f.title}`));
+    });
+
+    // Cross-referenced chunks
     if (uniqueChunks.length > 0) {
-      console.log(chalk.cyan.dim(" 📚 Cross-Referenced Local Architecture:"));
-      uniqueChunks.forEach((res, i) => {
-         console.log(chalk.gray(`  │ [${i + 1}] ${res.file.replace(process.cwd(), '')} ➔ ${res.symbolPath || '(anonymous)'}`));
+      console.log(chalk.cyan.dim("\n 📚 Cross-Referenced Architecture:"));
+      uniqueChunks.forEach((res: any, i: number) => {
+        const sources = res.sources ? res.sources.join("+") : "vector";
+        console.log(
+          chalk.gray(
+            `  │ [${i + 1}] ${res.file.replace(process.cwd(), "")} ➔ ${res.symbolPath || "(anonymous)"} [${sources}]`
+          )
+        );
       });
     }
 
+    // Memory context
+    if (memories.length > 0) {
+      console.log(chalk.yellow.dim("\n 🧠 Past Review Memories Used:"));
+      memories.forEach((mem: string, i: number) => {
+        console.log(chalk.gray(`  │ [${i + 1}] ${mem.slice(0, 120)}...`));
+      });
+    }
+
+    // ── Step 5: Store Review in Memory ──
+    try {
+      await memoryService.storeReviewMemory(options.pr, owner, repo, review);
+    } catch (err) {
+      console.warn(chalk.yellow("\n⚠️ Failed to store review in memory:"), err);
+    }
+
+    console.log("");
   } catch (err) {
     spinner.fail("Failed to review PR");
     console.error(err);

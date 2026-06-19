@@ -1,4 +1,4 @@
-import { Indexer, IntelligenceAgent } from "@vortex/engine";
+import { Indexer, IntelligenceAgent, MemoryService, ToolRegistry, GrepTool, FileReadTool } from "@vortex/engine";
 
 export async function searchCommand(options: any) {
   const { default: ora } = await import("ora");
@@ -13,8 +13,11 @@ export async function searchCommand(options: any) {
 
   const spinner = ora(`Searching codebase for: "${options.query}"...`).start();
   const indexer = new Indexer();
+
   try {
-    const results = await indexer.search(options.query, parseInt(options.limit, 10));
+    // Use hybrid search (vector + BM25 + cross-encoder reranking)
+    spinner.text = "Running hybrid search (vector + BM25 + cross-encoder)...";
+    const results = await indexer.hybridSearch(options.query, parseInt(options.limit, 10));
     
     if (results.length === 0) {
       spinner.fail("No relevant code found.");
@@ -22,6 +25,10 @@ export async function searchCommand(options: any) {
     }
     
     spinner.text = `Found ${results.length} relevant code chunks. Analyzing with Gemini...`;
+    
+    // Check for relevant memories
+    const memoryService = new MemoryService();
+    const memories = await memoryService.recallRelevantMemories(options.query, 3);
     
     const agent = new IntelligenceAgent();
     const answer = await agent.answerQueryWithContext(options.query, results);
@@ -35,16 +42,27 @@ export async function searchCommand(options: any) {
       margin: { top: 1, bottom: 1 },
       borderStyle: 'double',
       borderColor: 'cyan',
-      title: chalk.cyan.bold(' ✨ Vortex AI Engine '),
+      title: chalk.cyan.bold(' ✨ Vortex AI Engine (Hybrid Search) '),
       titleAlignment: 'center'
     });
     
     console.log(formatted);
     
-    console.log(chalk.cyan.dim(" 📚 Reference Material"));
-    results.forEach((res, i) => {
-       console.log(chalk.gray(`  │ [${i + 1}] ${res.file.replace(process.cwd(), '')} ➔ ${res.symbolPath || '(anonymous)'} (${res.score ? (res.score * 100).toFixed(1) + '%' : 'N/A'})`));
+    // Show reference material with source attribution
+    console.log(chalk.cyan.dim(" 📚 Reference Material (Hybrid Retrieval)"));
+    results.forEach((res: any, i: number) => {
+      const sources = res.sources ? res.sources.join("+") : "vector";
+      const scoreStr = res.score ? (res.score * 100).toFixed(1) + '%' : 'N/A';
+      console.log(chalk.gray(`  │ [${i + 1}] ${res.file.replace(process.cwd(), '')} ➔ ${res.symbolPath || '(anonymous)'} (${scoreStr}) [${sources}]`));
     });
+
+    // Show relevant memories if any
+    if (memories.length > 0) {
+      console.log(chalk.yellow.dim("\n 🧠 Relevant Memories"));
+      memories.forEach((mem: string, i: number) => {
+        console.log(chalk.gray(`  │ [${i + 1}] ${mem.slice(0, 120)}...`));
+      });
+    }
     
   } catch (err) {
     spinner.fail("Search failed");

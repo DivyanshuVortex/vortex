@@ -18,6 +18,7 @@ import { initCommand } from "./commands/init";
 import { searchCommand } from "./commands/search";
 import { reviewCommand } from "./commands/review";
 import { issueCommand } from "./commands/issue";
+import { graphCommand } from "./commands/graph";
 
 const program = new Command();
 
@@ -52,6 +53,12 @@ program
   .description("Analyze a GitHub issue, locate relevant codebase files, and propose a fix")
   .requiredOption("--id <number>", "Issue number", Number)
   .action(issueCommand);
+
+program
+  .command("graph")
+  .description("Generate a Mermaid JS dependency graph of the project or a specific file")
+  .option("--file <path>", "Filter graph to only include dependencies for a specific file")
+  .action(graphCommand);
 
 program
   .command("suggest")

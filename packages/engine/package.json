@@ -14,7 +14,8 @@
     "@vortex/db": "workspace:*",
     "@vortex/git": "workspace:*",
     "@vortex/github": "workspace:*",
-    "@vortex/retrieval": "workspace:*"
+    "@vortex/retrieval": "workspace:*",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@vortex/typescript-config": "workspace:*",
