@@ -1,7 +1,7 @@
 import { GraphRetriever } from "@vortex/retrieval";
 import { initDatabase } from "@vortex/db";
 
-export async function graphCommand(options: { file?: string }) {
+export async function graphCommand(options: { file?: string; detailed?: boolean }) {
   const { default: chalk } = await import("chalk");
   const { default: boxen } = await import("boxen");
   
@@ -12,7 +12,7 @@ export async function graphCommand(options: { file?: string }) {
     const graphRetriever = new GraphRetriever();
     
     const asciiTree = await graphRetriever.generateAsciiTree(options.file);
-    const mermaidCode = await graphRetriever.generateMermaidGraph(options.file);
+    const mermaidCode = await graphRetriever.generateMermaidGraph(options.file, options.detailed);
 
     console.log(
       boxen(asciiTree.trim(), {

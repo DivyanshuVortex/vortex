@@ -97,7 +97,7 @@ export class GraphRetriever {
   }
 
   // Generates Mermaid JS dependency graph.
-  public async generateMermaidGraph(file?: string): Promise<string> {
+  public async generateMermaidGraph(file?: string, detailed?: boolean): Promise<string> {
     const allDbChunks = await prisma.chunk.findMany({
       select: {
         id: true,
@@ -112,6 +112,105 @@ export class GraphRetriever {
       ...c,
       dependencies: JSON.parse(c.dependencies) as string[]
     }));
+
+    const isDetailed = detailed || !!file;
+
+    const sanitize = (str: string) => str.replace(/[^a-zA-Z0-9_]/g, "_");
+
+    if (!isDetailed) {
+      // File-level graph
+      let mermaid = "flowchart LR\n";
+      const files = Array.from(new Set(chunks.map(c => c.file))).sort();
+      
+      // Find common prefix to make paths relative
+      let commonPrefix: string = files.length > 0 ? files[0]! : "";
+      for (const f of files) {
+        let i = 0;
+        while (i < commonPrefix.length && i < f.length && commonPrefix[i] === f[i]) {
+          i++;
+        }
+        commonPrefix = commonPrefix.slice(0, i);
+      }
+      const lastSlash = commonPrefix.lastIndexOf('/');
+      if (lastSlash !== -1) {
+        commonPrefix = commonPrefix.substring(0, lastSlash + 1);
+      }
+
+      // Build tree
+      interface DirNode {
+        name: string;
+        files: string[];
+        dirs: Record<string, DirNode>;
+      }
+      const rootNode: DirNode = { name: "root", files: [], dirs: {} };
+
+      for (const f of files) {
+        const relPath = f.replace(commonPrefix, "");
+        const parts = relPath.split("/");
+        const fileName = parts.pop()!;
+        
+        let current = rootNode;
+        for (const dir of parts) {
+          if (!current.dirs[dir]) {
+            current.dirs[dir] = { name: dir, files: [], dirs: {} };
+          }
+          current = current.dirs[dir];
+        }
+        current.files.push(f);
+      }
+
+      const colors = ["#2C3E50", "#27AE60", "#2980B9", "#8E44AD", "#D35400", "#C0392B"];
+
+      const renderNode = (node: DirNode, depth: number, pathPrefix: string): string => {
+        let result = "";
+        const indent = "  ".repeat(depth);
+        const color = colors[depth % colors.length];
+        
+        for (const [dirName, childNode] of Object.entries(node.dirs)) {
+          const sgId = sanitize(pathPrefix + dirName);
+          result += `${indent}subgraph ${sgId}["${dirName}"]\n`;
+          result += `${indent}  style ${sgId} fill:${color},stroke:#ecf0f1,stroke-width:2px,color:#fff,rx:5,ry:5\n`;
+          result += renderNode(childNode, depth + 1, pathPrefix + dirName + "_");
+          result += `${indent}end\n`;
+        }
+        
+        for (const file of node.files) {
+          const shortFile = file.split("/").pop() || file;
+          const fileId = sanitize(file);
+          result += `${indent}  ${fileId}["${shortFile}"]\n`;
+          result += `${indent}  style ${fileId} fill:#34495E,stroke:#BDC3C7,stroke-width:1px,color:#fff,rx:3,ry:3\n`;
+        }
+        
+        return result;
+      };
+
+      mermaid += renderNode(rootNode, 1, "dir_");
+
+      const writtenEdges = new Set<string>();
+
+      for (const chunk of chunks) {
+        const callerFileId = sanitize(chunk.file);
+
+        for (const dep of chunk.dependencies) {
+          const callee = chunks.find(c => c.name === dep || c.symbolPath === dep);
+          if (callee && callee.file !== chunk.file) {
+            const calleeFileId = sanitize(callee.file);
+            const edgeKey = `${callerFileId}->${calleeFileId}`;
+            
+            if (!writtenEdges.has(edgeKey)) {
+              if (chunk.file.includes("components") || callee.file.includes("components")) {
+                mermaid += `  ${callerFileId} ==>|component| ${calleeFileId}\n`;
+              } else {
+                mermaid += `  ${callerFileId} --> ${calleeFileId}\n`;
+              }
+              writtenEdges.add(edgeKey);
+            }
+          }
+        }
+      }
+
+      return mermaid;
+    }
 
     // Find nodes matching the file filter
     const targetNodes = new Set<string>();
@@ -149,26 +248,36 @@ export class GraphRetriever {
     }
 
     const isNodeIncluded = (id: string) => !file || targetNodes.has(id);
-    const sanitize = (str: string) => str.replace(/[^a-zA-Z0-9_]/g, "_");
     
-    let mermaid = "flowchart TD\n";
+    let mermaid = "flowchart LR\n";
 
-    // Add node definitions
-    const writtenNodes = new Set<string>();
-    
+    // Group chunks by file to create subgraphs
+    const chunksByFile = new Map<string, any[]>();
     for (const chunk of chunks) {
       if (!isNodeIncluded(chunk.id)) continue;
+      const fileArr = chunksByFile.get(chunk.file) || [];
+      fileArr.push(chunk);
+      chunksByFile.set(chunk.file, fileArr);
+    }
 
-      const nodeId = sanitize(chunk.symbolPath || chunk.name || chunk.id);
+    const writtenNodes = new Set<string>();
+    
+    for (const [filePath, fileChunks] of chunksByFile.entries()) {
+      const shortFile = filePath.split("/").pop() || filePath;
+      const subgraphId = sanitize(filePath);
       
-      // Use filename as a hint in the node text
-      const shortFile = chunk.file.split("/").pop() || "";
-      const nodeText = `${chunk.symbolPath || chunk.name} (${shortFile})`;
+      mermaid += `  subgraph ${subgraphId}["${shortFile}"]\n`;
       
-      if (!writtenNodes.has(nodeId)) {
-        mermaid += `  ${nodeId}["${nodeText}"]\n`;
-        writtenNodes.add(nodeId);
+      for (const chunk of fileChunks) {
+        const nodeId = sanitize(chunk.symbolPath || chunk.name || chunk.id);
+        const nodeText = chunk.symbolPath || chunk.name;
+        
+        if (!writtenNodes.has(nodeId)) {
+          mermaid += `    ${nodeId}["${nodeText}"]\n`;
+          writtenNodes.add(nodeId);
+        }
       }
+      mermaid += `  end\n`;
     }
 
     // Add edges

@@ -68,6 +68,7 @@ program
   .command("graph")
   .description("Generate a Mermaid JS dependency graph of the project or a specific file")
   .option("--file <path>", "Filter graph to only include dependencies for a specific file")
+  .option("--detailed", "Include individual functions and classes in the graph instead of just files")
   .action(graphCommand);
 
 // ── AI-Powered Commands ──
