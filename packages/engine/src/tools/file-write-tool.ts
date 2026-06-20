@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { AgentTool } from "./tool-types";
+import { AgentTool, ApprovalCallback } from "./tool-types";
 import { VectorStore, LocalEmbedder, chunkFile } from "@vortex/retrieval";
 
 /**
@@ -17,11 +17,13 @@ export class FileWriteTool implements AgentTool {
   private cwd: string;
   private vectorStore?: VectorStore;
   private embedder?: LocalEmbedder;
+  private approvalCallback?: ApprovalCallback;
 
-  constructor(cwd?: string, vectorStore?: VectorStore, embedder?: LocalEmbedder) {
+  constructor(cwd?: string, vectorStore?: VectorStore, embedder?: LocalEmbedder, approvalCallback?: ApprovalCallback) {
     this.cwd = cwd || process.cwd();
     this.vectorStore = vectorStore;
     this.embedder = embedder;
+    this.approvalCallback = approvalCallback;
   }
 
   async execute(args: Record<string, string>): Promise<string> {
@@ -49,10 +51,28 @@ export class FileWriteTool implements AgentTool {
       return "Error: Cannot write to environment/secret files.";
     }
 
+    if (this.approvalCallback) {
+      const approved = await this.approvalCallback("write_file", filePath);
+      if (!approved) {
+        return "Error: User denied writing to this file.";
+      }
+    }
+
     try {
       const dir = path.dirname(absolutePath);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
+      }
+
+      // Rollback mechanism: Backup existing file before overwrite
+      if (fs.existsSync(absolutePath)) {
+        const backupDir = path.join(this.cwd, ".vortex_backup");
+        if (!fs.existsSync(backupDir)) {
+          fs.mkdirSync(backupDir, { recursive: true });
+        }
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const backupPath = path.join(backupDir, `${timestamp}_${basename}`);
+        fs.copyFileSync(absolutePath, backupPath);
       }
       
       fs.writeFileSync(absolutePath, content, "utf8");

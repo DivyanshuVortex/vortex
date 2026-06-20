@@ -48,7 +48,10 @@ export abstract class BaseAgent {
    */
   public async run(
     input: AgentInput,
-    options?: { onToolCall?: (toolName: string, args: Record<string, string>) => void }
+    options?: { 
+      onToolCall?: (toolName: string, args: Record<string, string>) => void;
+      onToolResult?: (toolName: string, result: string) => void;
+    }
   ): Promise<AgentOutput> {
     const prompt = this.buildPrompt(input);
     let fullPrompt = `${this.systemPrompt}\n\n${prompt}`;
@@ -87,7 +90,10 @@ export abstract class BaseAgent {
    */
   private async reactLoop(
     prompt: string,
-    options?: { onToolCall?: (toolName: string, args: Record<string, string>) => void }
+    options?: { 
+      onToolCall?: (toolName: string, args: Record<string, string>) => void;
+      onToolResult?: (toolName: string, result: string) => void;
+    }
   ): Promise<string> {
     let currentPrompt = prompt;
     let iterations = 0;
@@ -121,6 +127,10 @@ export abstract class BaseAgent {
         toolResult = await tool.execute(toolCall.args);
       } catch (err) {
         toolResult = `Error executing tool: ${err}`;
+      }
+
+      if (options?.onToolResult) {
+        options.onToolResult(toolCall.name, toolResult);
       }
 
       // Append tool result to context and re-prompt

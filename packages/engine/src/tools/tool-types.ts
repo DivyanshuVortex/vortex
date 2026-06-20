@@ -1,4 +1,9 @@
 /**
+ * ApprovalCallback — Function signature for requesting user approval.
+ */
+export type ApprovalCallback = (action: string, description: string) => Promise<boolean>;
+
+/**
  * AgentTool — Interface for tools that agents can use to verify their analysis.
  *
  * Tools allow agents to go beyond static diff analysis and actually

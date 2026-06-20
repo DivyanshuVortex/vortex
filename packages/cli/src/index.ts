@@ -35,6 +35,7 @@ import { fixNitbitsCommand } from "./commands/fix-nitbits";
 import { analyzeCommand } from "./commands/analyze";
 import { watchCommand } from "./commands/watch";
 import { solveCommand } from "./commands/solve";
+import { solveIssueCommand } from "./commands/solve-issue";
 
 const program = new Command();
 
@@ -82,7 +83,18 @@ program
   .command("solve")
   .description("Autonomously solve a task by writing code and executing commands")
   .argument("<prompt>", "The task you want the autonomous agent to solve")
-  .action(solveCommand);
+  .option("--auto-approve", "Skip interactive prompts for file writes and shell commands")
+  .option("--max-steps <number>", "Maximum number of agent loop iterations", Number, 5)
+  .option("--new-project <folder>", "Create a new project folder and initialize git before solving")
+  .action((prompt, options) => solveCommand(prompt, options));
+
+program
+  .command("solve-issue")
+  .description("Autonomously solve a GitHub issue using local RAG context")
+  .requiredOption("--id <number>", "Issue number", Number)
+  .option("--auto-approve", "Skip interactive prompts for file writes and shell commands")
+  .option("--max-steps <number>", "Maximum number of agent loop iterations", Number, 5)
+  .action(solveIssueCommand);
 
 // ── AI-Powered Commands ──
 

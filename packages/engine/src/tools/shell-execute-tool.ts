@@ -1,8 +1,9 @@
 import { exec } from "child_process";
 import { promisify } from "util";
-import { AgentTool } from "./tool-types";
+import { AgentTool, ApprovalCallback } from "./tool-types";
 
 const execAsync = promisify(exec);
+const BLACKLISTED_COMMANDS = ["rm", "mv", "sudo", "chmod", "chown", "su", "chgrp"];
 
 /**
  * ShellExecuteTool — Executes a shell command.
@@ -15,9 +16,11 @@ export class ShellExecuteTool implements AgentTool {
     'Execute a shell command. Args: {"command": "the command to run"}. Returns the standard output or error output.';
 
   private cwd: string;
+  private approvalCallback?: ApprovalCallback;
 
-  constructor(cwd?: string) {
+  constructor(cwd?: string, approvalCallback?: ApprovalCallback) {
     this.cwd = cwd || process.cwd();
+    this.approvalCallback = approvalCallback;
   }
 
   async execute(args: Record<string, string>): Promise<string> {
@@ -25,6 +28,18 @@ export class ShellExecuteTool implements AgentTool {
     
     if (!command) {
       return "Error: 'command' argument is required.";
+    }
+
+    const baseCmd = command.trim().split(/\s+/)[0] || "";
+    if (BLACKLISTED_COMMANDS.includes(baseCmd)) {
+      return `Error: Command '${baseCmd}' is blacklisted for safety reasons.`;
+    }
+
+    if (this.approvalCallback) {
+      const approved = await this.approvalCallback("shell_execute", command);
+      if (!approved) {
+        return "Error: User denied execution of this command.";
+      }
     }
 
     try {
