@@ -1,5 +1,17 @@
 import { GoogleGenAI } from "@google/genai";
 import { Groq } from "groq-sdk";
+import { LLMCacheManager } from "./cache";
+
+export interface GenerateOptions {
+  retries?: number;
+  /** Label for log messages (e.g., agent name) */
+  label?: string;
+  cache?: {
+    enabled: boolean;
+    commitHash?: string;
+    retrievalContextHash?: string;
+  };
+}
 
 /**
  * Shared Gemini API call utility with exponential backoff retry.
@@ -16,15 +28,30 @@ import { Groq } from "groq-sdk";
 export async function generateWithRetry(
   client: GoogleGenAI,
   prompt: string,
-  options?: {
-    retries?: number;
-    /** Label for log messages (e.g., agent name) */
-    label?: string;
-  }
+  options?: GenerateOptions
 ): Promise<string> {
   const maxGeminiRetries = options?.retries ?? 3;
   const maxGroqRetries = 3;
   const label = options?.label ?? "API";
+  const useCache = options?.cache?.enabled && process.env.VORTEX_DISABLE_CACHE !== "true";
+
+  let cacheInfo: ReturnType<typeof LLMCacheManager.generateCacheKey> | null = null;
+
+  if (useCache) {
+    cacheInfo = LLMCacheManager.generateCacheKey({
+      provider: "gemini", // We start with gemini
+      model: "gemini-2.5-flash",
+      userPrompt: prompt,
+      commitHash: options?.cache?.commitHash,
+      retrievalContextHash: options?.cache?.retrievalContextHash,
+    });
+
+    const cachedResponse = await LLMCacheManager.getCache(cacheInfo.key);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+  }
+
   let lastError: any;
 
   // 1. Try Gemini API
@@ -43,7 +70,19 @@ export async function generateWithRetry(
         }),
         timeoutPromise,
       ]);
-      return response.text || "";
+      const responseText = response.text || "";
+
+      if (useCache && cacheInfo) {
+        await LLMCacheManager.setCache({
+          key: cacheInfo.key,
+          model: "gemini-2.5-flash",
+          response: responseText,
+          promptHash: cacheInfo.promptHash,
+          contextHash: cacheInfo.contextHash,
+          commitHash: options?.cache?.commitHash,
+        });
+      }
+      return responseText;
     } catch (err: any) {
       lastError = err;
       if (err.status === 503 || err.status === 429) {
@@ -71,6 +110,21 @@ export async function generateWithRetry(
 
   const groqClient = new Groq({ apiKey: groqKey });
 
+  if (useCache) {
+    // Regenerate cache key for Groq model
+    cacheInfo = LLMCacheManager.generateCacheKey({
+      provider: "groq",
+      model: "qwen/qwen3-32b",
+      userPrompt: prompt,
+      commitHash: options?.cache?.commitHash,
+      retrievalContextHash: options?.cache?.retrievalContextHash,
+    });
+    const cachedResponse = await LLMCacheManager.getCache(cacheInfo.key);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+  }
+
   for (let i = 0; i < maxGroqRetries; i++) {
     try {
       const timeoutPromise = new Promise<never>((_, reject) =>
@@ -81,12 +135,24 @@ export async function generateWithRetry(
       );
       const response: any = await Promise.race([
         groqClient.chat.completions.create({
-          model: "allam-2-7b", // User requested fallback model
+          model: "qwen/qwen3-32b", // User requested fallback model
           messages: [{ role: "user", content: prompt }],
         }),
         timeoutPromise,
       ]);
-      return response.choices[0]?.message?.content || "";
+      const responseText = response.choices[0]?.message?.content || "";
+
+      if (useCache && cacheInfo) {
+        await LLMCacheManager.setCache({
+          key: cacheInfo.key,
+          model: "qwen/qwen3-32b",
+          response: responseText,
+          promptHash: cacheInfo.promptHash,
+          contextHash: cacheInfo.contextHash,
+          commitHash: options?.cache?.commitHash,
+        });
+      }
+      return responseText;
     } catch (err: any) {
       lastError = err;
       // Groq also returns 429 for rate limit and 503 for unavailable

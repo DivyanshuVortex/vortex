@@ -36,6 +36,7 @@ import { analyzeCommand } from "./commands/analyze";
 import { watchCommand } from "./commands/watch";
 import { solveCommand } from "./commands/solve";
 import { solveIssueCommand } from "./commands/solve-issue";
+import { cacheCommand } from "./commands/cache";
 
 const program = new Command();
 
@@ -43,6 +44,12 @@ program
   .name("vortex")
   .description("Developer Intelligence & PR Review Engine")
   .version("0.1.0");
+
+program.hook("preAction", (thisCommand, actionCommand) => {
+  if (actionCommand.opts().cache === false) {
+    process.env.VORTEX_DISABLE_CACHE = "true";
+  }
+});
 
 // ── Core Commands ──
 
@@ -57,6 +64,7 @@ program
   .description("Search the indexed codebase semantically and get an AI explanation")
   .requiredOption("-q, --query <text>", "Search query")
   .option("-l, --limit <number>", "Number of results to consider", "5")
+  .option("--no-cache", "Disable LLM response caching")
   .action(searchCommand);
 
 program
@@ -64,12 +72,14 @@ program
   .description("Review your changes using repository intelligence and historical PR patterns")
   .option("--pr <number>", "Pull request number", Number)
   .option("--deep", "Enable deep review analysis")
+  .option("--no-cache", "Disable LLM response caching")
   .action(reviewCommand);
 
 program
   .command("issue")
   .description("Analyze a GitHub issue, locate relevant codebase files, and propose a fix")
   .requiredOption("--id <number>", "Issue number", Number)
+  .option("--no-cache", "Disable LLM response caching")
   .action(issueCommand);
 
 program
@@ -104,6 +114,7 @@ program
   .requiredOption("--file <path>", "Target file path")
   .option("--apply", "Apply suggestions automatically")
   .option("--deep", "Enable advanced contextual suggestions")
+  .option("--no-cache", "Disable LLM response caching")
   .action(suggestCommand);
 
 program
@@ -119,6 +130,7 @@ program
   .description("Analyze other contributors' PRs using repository history and architectural intelligence")
   .requiredOption("--pr <number>", "Pull request number", Number)
   .option("--deep", "Enable advanced PR intelligence analysis")
+  .option("--no-cache", "Disable LLM response caching")
   .action(analyzeCommand);
 
 program
@@ -126,5 +138,7 @@ program
   .description("Continuously monitor local changes and provide live review feedback")
   .option("--deep", "Enable deep live analysis")
   .action(watchCommand);
+
+program.addCommand(cacheCommand);
 
 program.parse();

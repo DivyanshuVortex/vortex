@@ -161,3 +161,4 @@ export * from "./tools/file-read-tool";
 export * from "./tools/file-write-tool";
 export * from "./tools/shell-execute-tool";
 export * from "./tools/rag-search-tool";
+export * from "./cache";

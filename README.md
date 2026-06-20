@@ -123,6 +123,9 @@ GEMINI_API_KEY="your_key" vortex solve "add a button"
 - **`vortex issue --id <id>`**: Analyzes GitHub issues and proposes step-by-step local code fixes.
 - **`vortex graph`**: Automatically generates Mermaid dependency graphs of your files or entire project.
 - **`vortex fix-nitbits`**: AI-powered auto-fixer for linting, formatting, and minor structural issues.
+- **`vortex cache stats / clear`**: Manage the deterministic LLM response cache to save API costs and reduce latency.
+
+*Note: Most read-only analysis commands (like `issue`, `review`, `search`, `suggest`, `analyze`) automatically cache identical LLM requests to speed up subsequent runs and save API costs. You can bypass this using the `--no-cache` flag or by setting `VORTEX_DISABLE_CACHE=true`.*
 
 ## 10. Real-world Examples
 

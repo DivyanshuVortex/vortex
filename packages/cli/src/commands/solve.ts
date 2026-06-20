@@ -1,5 +1,5 @@
 import ora from "ora";
-import * as readline from "readline/promises";
+import * as readline from "node:readline/promises";
 import { execSync } from "child_process";
 import chalk from "chalk";
 import * as fs from "fs";
@@ -151,6 +151,27 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
 
     console.log(`\n${chalk.cyan('=== Final Output ===')}\n`);
     console.log(result.summary);
+
+    // Verification Step
+    const packageJsonPath = path.join(cwd, "package.json");
+    if (fs.existsSync(packageJsonPath)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
+        if (pkg.scripts && pkg.scripts.build) {
+          console.log(`\n${chalk.cyan('=== Verification ===')}`);
+          const buildSpinner = ora("Running build command...").start();
+          try {
+            execSync("npm run build", { stdio: "pipe", cwd });
+            buildSpinner.succeed("Build completed successfully.");
+          } catch (e: any) {
+            buildSpinner.fail("Build failed.");
+            console.error(chalk.red(e.stdout ? e.stdout.toString() : e.message));
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
   } catch (err: any) {
     spinner.fail("Agent encountered an error");
     console.error(err.message);

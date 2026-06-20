@@ -3,7 +3,8 @@ import { VectorStore, LocalEmbedder, BM25Index, HybridRetriever } from "@vortex/
 import { ReviewOrchestrator } from "./agents/orchestrator";
 import { OrchestratedReview, AgentContextChunk } from "./agents/types";
 import { generateWithRetry } from "./llm";
-
+import { execSync } from "child_process";
+import * as crypto from "crypto";
 export class IntelligenceAgent {
   private client: GoogleGenAI;
   private embedder: LocalEmbedder;
@@ -21,8 +22,31 @@ export class IntelligenceAgent {
     this.orchestrator = new ReviewOrchestrator(key);
   }
 
-  private async callLLM(prompt: string): Promise<string> {
-    return generateWithRetry(this.client, prompt, { label: "IntelligenceAgent" });
+  private async callLLM(prompt: string, cacheOpts?: { commitHash?: string, retrievalContextHash?: string, bypassCache?: boolean }): Promise<string> {
+    const enabled = !cacheOpts?.bypassCache;
+    return generateWithRetry(this.client, prompt, { 
+      label: "IntelligenceAgent",
+      cache: {
+        enabled,
+        commitHash: cacheOpts?.commitHash,
+        retrievalContextHash: cacheOpts?.retrievalContextHash
+      }
+    });
+  }
+
+  private getCurrentCommitHash(): string {
+    try {
+      const hash = execSync("git rev-parse HEAD").toString().trim();
+      const isDirty = execSync("git status --porcelain").toString().trim().length > 0;
+      return isDirty ? `${hash}-dirty` : hash;
+    } catch {
+      return "unknown";
+    }
+  }
+
+  private computeChunksHash(chunks: any[]): string {
+    if (!chunks || chunks.length === 0) return "";
+    return crypto.createHash("sha256").update(chunks.map(c => c.id || c.file).join("|")).digest("hex");
   }
 
   /**
@@ -44,7 +68,8 @@ ${diff}
     `;
 
     try {
-      let result = await this.callLLM(prompt);
+      // Bypassing cache for extraction since it's just intermediate processing
+      let result = await this.callLLM(prompt, { bypassCache: true });
       if (result.startsWith("\`\`\`")) {
         result = result.replace(/^\`\`\`[a-z]*\n/, "").replace(/\n\`\`\`$/, "");
       }
@@ -92,7 +117,10 @@ ${contextStr}
 Format your review beautifully with markdown.
     `;
 
-    const result = await this.callLLM(prompt);
+    const result = await this.callLLM(prompt, {
+      commitHash: this.getCurrentCommitHash(),
+      retrievalContextHash: this.computeChunksHash(chunks)
+    });
     return result || "No review generated.";
   }
 
@@ -116,7 +144,10 @@ ${relevantContext.map((c, i) => `--- Chunk ${i + 1} (${c.file} - ${c.symbolPath 
 
 Use heavy markdown formatting (bolding, lists, code blocks with syntax highlighting) and emojis to make your analysis highly readable. Focus on being deeply technical and actionable.
 `;
-    return this.callLLM(prompt);
+    return this.callLLM(prompt, {
+      commitHash: this.getCurrentCommitHash(),
+      retrievalContextHash: this.computeChunksHash(relevantContext)
+    });
   }
 
   /**
@@ -136,7 +167,10 @@ ${fileContent}
 \`\`\`
     `;
 
-    const result = await this.callLLM(prompt);
+    const result = await this.callLLM(prompt, {
+      commitHash: this.getCurrentCommitHash(),
+      retrievalContextHash: crypto.createHash("sha256").update(fileContent).digest("hex") // hash the content directly for suggestions
+    });
     return result || "No suggestions generated.";
   }
 
@@ -155,7 +189,7 @@ ${fileContent}
 \`\`\`
     `;
 
-    let fixedCode = await this.callLLM(prompt);
+    let fixedCode = await this.callLLM(prompt, { bypassCache: true }); // AutoFix modifies files, DO NOT CACHE
     if (!fixedCode) return fileContent;
     
     // Strip markdown formatting if the model still outputs it
@@ -192,7 +226,9 @@ ${diff}
 Format your review beautifully with markdown.
     `;
 
-    const result = await this.callLLM(prompt);
+    const result = await this.callLLM(prompt, {
+      commitHash: this.getCurrentCommitHash()
+    });
     return result || "No review generated.";
   }
 
@@ -227,7 +263,10 @@ Your answer must follow these strict guidelines:
 5. If the provided chunks do not contain enough information to answer fully, explicitly state what is missing.
 `;
 
-    return await this.callLLM(prompt);
+    return await this.callLLM(prompt, {
+      commitHash: this.getCurrentCommitHash(),
+      retrievalContextHash: this.computeChunksHash(chunks)
+    });
   }
 
   /**

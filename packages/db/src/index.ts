@@ -58,6 +58,20 @@ export async function initDatabase() {
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "LLMCache" (
+      "key" TEXT NOT NULL PRIMARY KEY,
+      "model" TEXT NOT NULL,
+      "response" TEXT NOT NULL,
+      "promptHash" TEXT NOT NULL,
+      "contextHash" TEXT NOT NULL,
+      "commitHash" TEXT,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "lastAccessedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "hitCount" INTEGER NOT NULL DEFAULT 0
+    );
+  `);
 }
 
 export * from "@prisma/client";

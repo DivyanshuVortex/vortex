@@ -54,3 +54,17 @@ model ReviewHistory {
   createdAt  DateTime @default(now())
 }
 
+/// Cache for LLM responses to reduce latency and API cost
+model LLMCache {
+  key            String   @id
+  model          String
+  response       String
+
+  promptHash     String
+  contextHash    String
+  commitHash     String?
+
+  createdAt      DateTime @default(now())
+  lastAccessedAt DateTime @default(now())
+  hitCount       Int      @default(0)
+}
