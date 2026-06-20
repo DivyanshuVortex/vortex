@@ -8,7 +8,7 @@ import { AgentInput, AgentOutput } from "./types";
  * mutate the project state, build projects from scratch, and fix bugs.
  */
 export class AutonomousAgent extends BaseAgent {
-  name = "AutonomousAgent";
+  name = "Vortex";
   
   // Override max iterations to allow for long-running autonomous tasks (increased from 15 to 30)
   protected maxToolIterations = 30;
@@ -24,6 +24,7 @@ CRITICAL WORKFLOW RULES:
 3. BEFORE writing a new file, you MUST use the \`rag_search\` tool to retrieve the exact contents, signatures, or CSS classes of previously written files. This ensures your files never go out of sync.
 4. If building a new project, use \`shell_execute\` to run init commands first.
 5. CONTINUOUS EXECUTION: Do NOT stop or provide your final answer until the ENTIRE task is fully completed. If the user asked for a project with multiple files, you MUST continue making tool calls sequentially until every single file is written and verified.
+6. NO THEORETICAL FIXES: Do NOT provide a textual explanation of how to fix a bug as your final answer. You MUST actually use the \`write_file\` or \`shell_execute\` tools to apply the fix yourself before concluding.
 
 Important Rules:
 - When writing files, write the full content. Do not write partial chunks.

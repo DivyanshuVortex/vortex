@@ -183,11 +183,20 @@ export abstract class BaseAgent {
     if (objectMatch) {
       try {
         const parsed = JSON.parse(objectMatch[0]);
-        if (parsed && parsed.tool_call && parsed.tool_call.name) {
-          return {
-            name: parsed.tool_call.name,
-            args: parsed.tool_call.args || {},
-          };
+        if (parsed) {
+          const extractedName = parsed.tool_call?.name || parsed.name || parsed.function?.name;
+          const extractedArgs = parsed.tool_call?.args || parsed.parameters || parsed.arguments || parsed.function?.arguments || {};
+          
+          if (extractedName && extractedName !== "FINAL_ANSWER") {
+            let finalArgs = extractedArgs;
+            if (typeof extractedArgs === "string") {
+              try { finalArgs = JSON.parse(extractedArgs); } catch (e) {}
+            }
+            return {
+              name: extractedName,
+              args: finalArgs,
+            };
+          }
         }
       } catch {
         // Fallthrough
@@ -199,7 +208,36 @@ export abstract class BaseAgent {
       /\{"tool_call"\s*:\s*\{[\s\S]*?"name"\s*:\s*"([^"]+)"[\s\S]*\}\s*\}/
     );
 
-    if (!toolCallMatch) return null;
+    const fallbackParser = () => {
+      if (cleaned.includes('"write_file"')) {
+        const pathMatch = cleaned.match(/"path"\s*:\s*"([^"]+)"/);
+        const contentMatch = cleaned.match(/"content"\s*:\s*"([\s\S]*)"\s*\}\s*\}/);
+        if (pathMatch && contentMatch && pathMatch[1] && contentMatch[1]) {
+          return {
+            name: "write_file",
+            args: {
+              path: pathMatch[1],
+              content: contentMatch[1].replace(/\\"/g, '"')
+            } as Record<string, string>
+          };
+        }
+      }
+      
+      if (cleaned.includes('"shell_execute"')) {
+        const commandMatch = cleaned.match(/"command"\s*:\s*"([\s\S]*)"\s*\}\s*\}/);
+        if (commandMatch && commandMatch[1]) {
+          return {
+            name: "shell_execute",
+            args: {
+              command: commandMatch[1].replace(/\\"/g, '"')
+            } as Record<string, string>
+          };
+        }
+      }
+      return null;
+    };
+
+    if (!toolCallMatch) return fallbackParser();
 
     try {
       const parsed = JSON.parse(toolCallMatch[0]);
@@ -208,7 +246,7 @@ export abstract class BaseAgent {
         args: parsed.tool_call.args || {},
       };
     } catch {
-      return null;
+      return fallbackParser();
     }
   }
 

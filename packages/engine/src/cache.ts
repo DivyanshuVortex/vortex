@@ -115,6 +115,52 @@ export class LLMCacheManager {
   }
 
   /**
+   * Gets the last successfully working model within the last hour.
+   */
+  public static async getWorkingModel(): Promise<string | null> {
+    try {
+      const entry = await prisma.lLMCache.findUnique({
+        where: { key: "__WORKING_MODEL__" },
+      });
+      if (!entry) return null;
+
+      // Check if it's within 1 hour
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      if (entry.lastAccessedAt < oneHourAgo) {
+        return null;
+      }
+      return entry.model;
+    } catch (e) {
+      console.error("GET WORKING MODEL ERR:", e);
+      return null;
+    }
+  }
+
+  /**
+   * Caches the successfully working model.
+   */
+  public static async setWorkingModel(model: string): Promise<void> {
+    try {
+      await prisma.lLMCache.upsert({
+        where: { key: "__WORKING_MODEL__" },
+        create: {
+          key: "__WORKING_MODEL__",
+          model: model,
+          response: "",
+          promptHash: "",
+          contextHash: "",
+        },
+        update: {
+          model: model,
+          lastAccessedAt: new Date()
+        }
+      });
+    } catch {
+      // ignore
+    }
+  }
+
+  /**
    * Returns cache statistics.
    */
   public static async getStats(): Promise<{

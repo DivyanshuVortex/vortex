@@ -14,6 +14,7 @@ import {
   ApprovalCallback,
   AgentContextChunk
 } from "@vortex/engine";
+import { initDatabase } from "@vortex/db";
 import { getGitRoot, isGitRepo } from "@vortex/git";
 import { VectorStore, LocalEmbedder } from "@vortex/retrieval";
 
@@ -47,6 +48,8 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
 
   console.log(`\n🤖 Vortex Autonomous Agent activated`);
   console.log(`Task: "${prompt}"\n`);
+
+  await initDatabase();
 
   const spinner = ora("Initializing Vector Store for Project Memory...").start();
 
