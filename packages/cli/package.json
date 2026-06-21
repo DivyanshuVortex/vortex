@@ -1,6 +1,6 @@
 {
-  "name": "vortex-cli",
-  "version": "0.1.1",
+  "name": "@vortex-ai/cli",
+  "version": "0.1.2",
   "description": "Vortex CLI - The main entry point",
   "main": "./dist/index.js",
   "bin": {
@@ -25,7 +25,6 @@
     "@xenova/transformers": "^2.17.2",
     "boxen": "7",
     "chalk": "^5.6.2",
-    "chokidar": "^5.0.0",
     "commander": "^12.1.0",
     "dotenv": "^17.4.2",
     "marked": "^15.0.12",

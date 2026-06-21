@@ -140,7 +140,7 @@ Vortex is engineered for speed and cost-efficiency, keeping the heavy lifting lo
 
 ## Contributing
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on how to set up the development environment, run tests, and submit pull requests.
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on how to set up the development environment and submit pull requests.
 
 ### Development Setup
 ```bash

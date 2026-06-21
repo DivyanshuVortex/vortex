@@ -36,7 +36,6 @@ import { graphCommand } from "./commands/graph";
 import { suggestCommand } from "./commands/suggest";
 import { fixNitbitsCommand } from "./commands/fix-nitbits";
 import { analyzeCommand } from "./commands/analyze";
-import { watchCommand } from "./commands/watch";
 import { solveCommand } from "./commands/solve";
 import { solveIssueCommand } from "./commands/solve-issue";
 import { cacheCommand } from "./commands/cache";
@@ -135,12 +134,6 @@ program
   .option("--deep", "Enable advanced PR intelligence analysis")
   .option("--no-cache", "Disable LLM response caching")
   .action(analyzeCommand);
-
-program
-  .command("watch")
-  .description("Continuously monitor local changes and provide live review feedback")
-  .option("--deep", "Enable deep live analysis")
-  .action(watchCommand);
 
 program.addCommand(cacheCommand);
 

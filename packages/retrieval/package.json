@@ -7,8 +7,7 @@
     "build": "tsup src/index.ts --format cjs,esm --dts",
     "dev": "tsup src/index.ts --format cjs,esm --watch",
     "lint": "eslint .",
-    "check-types": "tsc --noEmit",
-    "test:pipeline": "tsx --env-file=../../.env src/test.ts"
+    "check-types": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^22.19.17",

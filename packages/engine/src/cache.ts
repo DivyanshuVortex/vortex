@@ -114,7 +114,7 @@ export class LLMCacheManager {
   }
 
   /**
-   * Gets the last successfully working model within the last hour.
+   * Gets the last successfully working model within the last 15 minutes.
    */
   public static async getWorkingModel(): Promise<string | null> {
     try {
@@ -124,8 +124,8 @@ export class LLMCacheManager {
       if (!entry) return null;
 
 
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-      if (entry.lastAccessedAt < oneHourAgo) {
+      const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+      if (entry.lastAccessedAt < fifteenMinutesAgo) {
         return null;
       }
       return entry.model;
