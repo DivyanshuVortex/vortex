@@ -1,6 +1,6 @@
 {
   "name": "@vortex-ai/cli",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "description": "Vortex CLI - The main entry point",
   "main": "./dist/index.js",
   "bin": {
@@ -16,12 +16,11 @@
   "dependencies": {
     "@octokit/rest": "^22.0.1",
     "@types/marked-terminal": "^6.1.1",
-    "@vortex/engine": "workspace:*",
-    "@vortex/github": "workspace:*",
-    "@vortex/git": "workspace:*",
-    "@vortex/shared": "workspace:*",
-    "@vortex/retrieval": "workspace:*",
-    "@vortex/db": "workspace:*",
+    "@google/genai": "^2.5.0",
+    "groq-sdk": "^1.2.1",
+    "@prisma/client": "^5.14.0",
+    "ignore": "^7.0.5",
+    "minisearch": "^7.2.0",
     "@xenova/transformers": "^2.17.2",
     "boxen": "7",
     "chalk": "^5.6.2",
@@ -34,6 +33,12 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@vortex/engine": "workspace:*",
+    "@vortex/github": "workspace:*",
+    "@vortex/git": "workspace:*",
+    "@vortex/shared": "workspace:*",
+    "@vortex/retrieval": "workspace:*",
+    "@vortex/db": "workspace:*",
     "@vortex/typescript-config": "workspace:*",
     "tsup": "^8.0.2",
     "tsx": "^4.21.0",

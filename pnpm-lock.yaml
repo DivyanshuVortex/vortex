@@ -20,12 +20,58 @@ importers:
 
   packages/cli:
     dependencies:
+      '@google/genai':
+        specifier: ^2.5.0
+        version: 2.5.0
       '@octokit/rest':
         specifier: ^22.0.1
         version: 22.0.1
+      '@prisma/client':
+        specifier: ^5.14.0
+        version: 5.22.0(prisma@5.22.0)
       '@types/marked-terminal':
         specifier: ^6.1.1
         version: 6.1.1
+      '@xenova/transformers':
+        specifier: ^2.17.2
+        version: 2.17.2
+      boxen:
+        specifier: '7'
+        version: 7.1.1
+      chalk:
+        specifier: ^5.6.2
+        version: 5.6.2
+      commander:
+        specifier: ^12.1.0
+        version: 12.1.0
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+      groq-sdk:
+        specifier: ^1.2.1
+        version: 1.2.1
+      ignore:
+        specifier: ^7.0.5
+        version: 7.0.5
+      marked:
+        specifier: ^15.0.12
+        version: 15.0.12
+      marked-terminal:
+        specifier: ^7.3.0
+        version: 7.3.0(marked@15.0.12)
+      minisearch:
+        specifier: ^7.2.0
+        version: 7.2.0
+      ora:
+        specifier: ^9.4.0
+        version: 9.4.0
+      parse-diff:
+        specifier: ^0.12.0
+        version: 0.12.0
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
       '@vortex/db':
         specifier: workspace:*
         version: link:../db
@@ -44,37 +90,6 @@ importers:
       '@vortex/shared':
         specifier: workspace:*
         version: link:../shared
-      '@xenova/transformers':
-        specifier: ^2.17.2
-        version: 2.17.2
-      boxen:
-        specifier: '7'
-        version: 7.1.1
-      chalk:
-        specifier: ^5.6.2
-        version: 5.6.2
-      commander:
-        specifier: ^12.1.0
-        version: 12.1.0
-      dotenv:
-        specifier: ^17.4.2
-        version: 17.4.2
-      marked:
-        specifier: ^15.0.12
-        version: 15.0.12
-      marked-terminal:
-        specifier: ^7.3.0
-        version: 7.3.0(marked@15.0.12)
-      ora:
-        specifier: ^9.4.0
-        version: 9.4.0
-      parse-diff:
-        specifier: ^0.12.0
-        version: 0.12.0
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-    devDependencies:
       '@vortex/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
