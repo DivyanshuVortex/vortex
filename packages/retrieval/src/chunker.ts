@@ -3,13 +3,20 @@ import * as fs from "fs";
 import * as path from "path";
 import crypto from "crypto";
 
+const FALLBACK_KEYWORD_BLOCKLIST = new Set([
+  "if", "for", "while", "switch", "catch", "function", "return", "typeof",
+  "new", "in", "of", "do", "with", "void", "delete", "yield", "await",
+  "else", "try", "finally", "class", "case", "instanceof", "throw",
+]);
+
 export type ChunkKind =
   | "function"
   | "class"
   | "method"
   | "interface"
   | "type"
-  | "enum";
+  | "enum"
+  | "variable";
 
 export interface Chunk {
   id: string;
@@ -124,6 +131,13 @@ export function chunkFile(
       return "function";
     }
 
+    if (
+      ts.isCallExpression(node) ||
+      ts.isVariableDeclaration(node)
+    ) {
+      return "variable";
+    }
+
     if (ts.isClassDeclaration(node)) {
       return "class";
     }
@@ -183,19 +197,14 @@ export function chunkFile(
     "Promise", "Error", "Map", "Set", "RegExp"
   ]);
 
-  /**
-   * Collect only meaningful deps
-   */
+
   function extractDependencies(
     node: ts.Node,
   ): string[] {
     const deps = new Set<string>();
 
     function collect(n: ts.Node) {
-      /**
-       * fn()
-       * obj.method()
-       */
+
       if (ts.isCallExpression(n)) {
         const text = n.expression.getText(sourceFile);
         if (!COMMON_BUILTINS.has(text)) {
@@ -203,9 +212,7 @@ export function chunkFile(
         }
       }
 
-      /**
-       * import x from "pkg"
-       */
+
       if (
         ts.isImportDeclaration(n)
       ) {
@@ -225,17 +232,8 @@ export function chunkFile(
   }
 
   function createChunk(params: {
-    /**
-     * Semantic node
-     */
     node: ts.Node;
 
-    /**
-     * Actual source content node
-     *
-     * Used for:
-     * const foo = () => {}
-     */
     contentNode?: ts.Node;
 
     name: string;
@@ -350,9 +348,7 @@ export function chunkFile(
     node: ts.Node,
     parentSymbol?: string,
   ) {
-    /**
-     * function foo() {}
-     */
+
     if (
       ts.isFunctionDeclaration(
         node,
@@ -367,9 +363,7 @@ export function chunkFile(
       });
     }
 
-    /**
-     * class Foo {}
-     */
+
     if (
       ts.isClassDeclaration(
         node,
@@ -386,24 +380,15 @@ export function chunkFile(
         name: className,
       });
 
-      /**
-       * Visit class members manually
-       */
+
       for (const member of node.members) {
         visit(member, className);
       }
 
-      /**
-       * Prevent duplicate traversal
-       */
       return;
     }
 
-    /**
-     * class Foo {
-     *   login() {}
-     * }
-     */
+
     if (
       ts.isMethodDeclaration(
         node,
@@ -419,10 +404,7 @@ export function chunkFile(
       });
     }
 
-    /**
-     * const foo = () => {}
-     * const foo = function() {}
-     */
+
     if (
       ts.isVariableDeclaration(
         node,
@@ -431,26 +413,27 @@ export function chunkFile(
       const initializer =
         node.initializer;
 
-      if (
-        initializer &&
-        (
-          ts.isArrowFunction(
-            initializer,
-          ) ||
-          ts.isFunctionExpression(
-            initializer,
-          )
-        )
-      ) {
+      let isFunctionLike = false;
+
+      if (initializer) {
+        if (
+          ts.isArrowFunction(initializer) ||
+          ts.isFunctionExpression(initializer)
+        ) {
+          isFunctionLike = true;
+        } else if (ts.isCallExpression(initializer)) {
+          isFunctionLike = initializer.arguments.some(
+            (arg) =>
+              ts.isArrowFunction(arg) ||
+              ts.isFunctionExpression(arg)
+          );
+        }
+      }
+
+      if (isFunctionLike && initializer) {
         createChunk({
-          /**
-           * Semantic kind
-           */
           node: initializer,
 
-          /**
-           * Full declaration content
-           */
           contentNode: node,
 
           name: node.name.getText(
@@ -462,9 +445,7 @@ export function chunkFile(
       }
     }
 
-    /**
-     * interface Foo {}
-     */
+
     if (
       ts.isInterfaceDeclaration(
         node,
@@ -478,9 +459,7 @@ export function chunkFile(
       });
     }
 
-    /**
-     * type Foo = {}
-     */
+
     if (
       ts.isTypeAliasDeclaration(
         node,
@@ -494,9 +473,7 @@ export function chunkFile(
       });
     }
 
-    /**
-     * enum Foo {}
-     */
+
     if (
       ts.isEnumDeclaration(
         node,
@@ -522,21 +499,54 @@ export function chunkFile(
 
   visit(sourceFile);
 
-  // Fallback: If no chunks were created (e.g., non-TS/JS files like CSS/HTML),
-  // chunk the entire file as a single chunk.
   if (chunks.length === 0 && source.trim().length > 0) {
     const filename = path.basename(filePath);
+    const basename = path.basename(filePath, path.extname(filePath));
     const hash = getHash(source);
+    
+    const deps = new Set<string>();
+
+    const pyRegex = /(?:^|\n)\s*(?:from|import)\s+([a-zA-Z0-9_.]+)/g;
+    let match;
+    while ((match = pyRegex.exec(source)) !== null) {
+      const p = match[1]!;
+      deps.add(p.split('.').pop()!);
+      deps.add(p);
+    }
+
+    const goRegex = /"([^"]+)"/g;
+    while ((match = goRegex.exec(source)) !== null) {
+      const p = match[1]!;
+      deps.add(p);
+      const parts = p.split('/');
+      deps.add(parts[parts.length - 1]!);
+    }
+
+    const cppRegex = /#include\s*[<"]([^>"]+)[>"]/g;
+    while ((match = cppRegex.exec(source)) !== null) {
+      const p = match[1]!;
+      deps.add(p);
+      deps.add(p.replace(/\.[^/.]+$/, ""));
+    }
+
+    const callRegex = /([a-zA-Z_]\w*)\s*\(/g;
+    while ((match = callRegex.exec(source)) !== null) {
+      const ident = match[1]!;
+      if (!FALLBACK_KEYWORD_BLOCKLIST.has(ident)) {
+        deps.add(ident);
+      }
+    }
+
     chunks.push({
       id: `${filename}:${hash.slice(0, 12)}`,
       file: filePath,
       language: getLanguage(filePath),
-      name: filename,
+      name: basename,
       symbolPath: filename,
-      kind: "function" as ChunkKind, // Using a known kind from the enum
+      kind: "function" as ChunkKind,
       isExported: false,
       isAsync: false,
-      dependencies: [],
+      dependencies: Array.from(deps),
       startLine: 1,
       endLine: source.split('\n').length,
       hash: hash,

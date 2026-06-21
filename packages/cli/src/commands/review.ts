@@ -20,9 +20,9 @@ export async function reviewCommand(options: any) {
   });
 
   if (options.pr) {
-    console.log(chalk.blue.bold(`\n🌀 Multi-Agent Review for PR #${options.pr}\n`));
+    console.log(chalk.blue.bold(`\nMulti-Agent Review for PR #${options.pr}\n`));
   } else {
-    console.log(chalk.blue.bold(`\n🌀 Multi-Agent Review for Local Changes\n`));
+    console.log(chalk.blue.bold(`\nMulti-Agent Review for Local Changes\n`));
   }
 
   if (!process.env.GITHUB_TOKEN) {
@@ -54,7 +54,7 @@ export async function reviewCommand(options: any) {
   ).start();
 
   try {
-    // ── Step 1: Fetch Diff ──
+
     let diff: string;
     if (options.pr) {
       const github = createGithubClient(process.env.GITHUB_TOKEN);
@@ -68,7 +68,7 @@ export async function reviewCommand(options: any) {
       }
     }
 
-    // ── Step 2: Extract Queries & Run Hybrid Search ──
+
     spinner.text = "Extracting architectural queries from diff...";
     const agent = new IntelligenceAgent();
     const indexer = new Indexer();
@@ -84,12 +84,12 @@ export async function reviewCommand(options: any) {
       }
     }
 
-    // Deduplicate chunks by ID
+
     const uniqueChunks = Array.from(
       new Map(allChunks.map((c) => [c.id, c])).values()
     );
 
-    // ── Step 3: Recall Relevant Memories ──
+
     spinner.text = "Checking memory for relevant past reviews...";
     const memoryService = new MemoryService();
     const memories = await memoryService.recallRelevantMemories(
@@ -97,7 +97,7 @@ export async function reviewCommand(options: any) {
       3
     );
 
-    // ── Step 4: Run Multi-Agent Review ──
+
     spinner.text = `Running multi-agent review (Security + Architecture + Synthesis)...`;
     const review = await agent.generateMultiAgentReview(
       diff,
@@ -111,9 +111,7 @@ export async function reviewCommand(options: any) {
       )
     );
 
-    // ── Display Results ──
 
-    // Main review report
     const parsedReview = await marked.parse(review.markdownReport);
 
     const verdictColor =
@@ -135,13 +133,13 @@ export async function reviewCommand(options: any) {
       margin: { top: 1, bottom: 1 },
       borderStyle: "double",
       borderColor: borderColor as any,
-      title: chalk.bold(` ✨ Multi-Agent Code Review `),
+      title: chalk.bold(` Multi-Agent Code Review `),
       titleAlignment: "center",
     });
 
     console.log(formatted);
 
-    // Verdict banner
+
     console.log(
       boxen(verdictColor.bold(`  ${review.verdict}  `), {
         padding: { left: 2, right: 2 },
@@ -151,12 +149,12 @@ export async function reviewCommand(options: any) {
       })
     );
 
-    // Agent summary cards
+
     const { security, architecture } = review.agentOutputs;
 
     console.log(
       chalk.dim(
-        `\n 🛡️  Security: ${security.riskLevel} (${security.findings.length} findings)`
+        `\n Security: ${security.riskLevel} (${security.findings.length} findings)`
       )
     );
     security.findings.forEach((f: any, i: number) => {
@@ -171,7 +169,7 @@ export async function reviewCommand(options: any) {
 
     console.log(
       chalk.dim(
-        `\n 🏗️  Architecture: ${architecture.consistencyScore} (${architecture.findings.length} findings)`
+        `\n Architecture: ${architecture.consistencyScore} (${architecture.findings.length} findings)`
       )
     );
     architecture.findings.forEach((f: any, i: number) => {
@@ -184,9 +182,8 @@ export async function reviewCommand(options: any) {
       console.log(severityColor(`    [${f.severity.toUpperCase()}] ${f.title}`));
     });
 
-    // Cross-referenced chunks
     if (uniqueChunks.length > 0) {
-      console.log(chalk.cyan.dim("\n 📚 Cross-Referenced Architecture:"));
+      console.log(chalk.cyan.dim("\n Cross-Referenced Architecture:"));
       uniqueChunks.forEach((res: any, i: number) => {
         const sources = res.sources ? res.sources.join("+") : "vector";
         console.log(
@@ -197,15 +194,14 @@ export async function reviewCommand(options: any) {
       });
     }
 
-    // Memory context
     if (memories.length > 0) {
-      console.log(chalk.yellow.dim("\n 🧠 Past Review Memories Used:"));
+      console.log(chalk.yellow.dim("\n Past Review Memories Used:"));
       memories.forEach((mem: string, i: number) => {
         console.log(chalk.gray(`  │ [${i + 1}] ${mem.slice(0, 120)}...`));
       });
     }
 
-    // ── Step 5: Store Review in Memory ──
+
     if (options.pr) {
       try {
         await memoryService.storeReviewMemory(options.pr, owner, repo, review);

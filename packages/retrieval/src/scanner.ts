@@ -9,7 +9,6 @@ function loadGitignore(dir : string){
         const content = fs.readFileSync(gitignorePath, 'utf-8');
         ign.add(content);
     }catch (e) {
-        // No .gitignore file, ignore silently
     }
 
       ign.add(["node_modules", ".git", "dist", "build", "out", ".next",

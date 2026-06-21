@@ -7,7 +7,7 @@ export async function solveIssueCommand(options: any) {
   const { default: ora } = await import("ora");
   const { default: chalk } = await import("chalk");
 
-  console.log(chalk.blue(`\n🚀 Autonomous Agent solving Issue #${options.id}`));
+  console.log(chalk.blue(`\nAutonomous Agent solving Issue #${options.id}`));
 
   if (!process.env.GITHUB_TOKEN) {
     console.log(chalk.yellow("⚠️ No GITHUB_TOKEN found. Using anonymous access (subject to rate limits)."));
@@ -31,13 +31,12 @@ export async function solveIssueCommand(options: any) {
 
     spinner.text = `Issue fetched. Searching local vector database for relevant code...`;
     
-    // Perform RAG lookup using the issue title as the query
     const indexer = new Indexer();
     const relevantContext = await indexer.hybridSearch(issue.title, 5);
     
     spinner.succeed("Issue and Context fetched successfully!\n");
     
-    // Construct the prompt for the AutonomousAgent
+
     const prompt = `Solve the following GitHub issue:
 # ${issue.title}
 
@@ -48,7 +47,7 @@ ${comments.map((c: any, i: number) => `Comment ${i + 1} (@${c.user?.login}): ${c
 
 Please fix this issue in the codebase.`;
 
-    // Map hybrid search results to AgentContextChunk format
+
     const contextChunks = relevantContext.map((c: any) => ({
       file: c.file,
       symbolPath: c.symbolPath || "anonymous",
@@ -56,7 +55,7 @@ Please fix this issue in the codebase.`;
       kind: c.kind || "unknown",
     }));
 
-    // Delegate to the autonomous solver
+
     await solveCommand(prompt, {
       autoApprove: options.autoApprove,
       maxSteps: options.maxSteps,

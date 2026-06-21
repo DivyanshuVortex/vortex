@@ -90,4 +90,4 @@ Desktop.ini
 # ==============================
 *.pem
 *.tgz
-packages/cli/.vortex-bm25.json
+.vortex-bm25.json

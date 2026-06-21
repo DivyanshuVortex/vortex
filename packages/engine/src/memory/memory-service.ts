@@ -85,7 +85,7 @@ export class MemoryService {
       },
     });
 
-    console.log(`  💾 Review memory stored for PR #${prNumber}`);
+    console.log(`  Review memory stored for PR #${prNumber}`);
   }
 
   /**
@@ -134,7 +134,7 @@ export class MemoryService {
       ]);
       queryEmbedding = embeddings[0] ?? null;
     } catch {
-      // Fallback to keyword search
+
     }
 
     const allMemories = await prisma.memory.findMany({
@@ -148,7 +148,7 @@ export class MemoryService {
 
     if (allMemories.length === 0) return [];
 
-    // If we have a query embedding, rank by cosine similarity
+
     if (queryEmbedding) {
       const scored = allMemories
         .map((mem: any) => {
@@ -167,11 +167,11 @@ export class MemoryService {
         .slice(0, limit);
 
       return scored
-        .filter((s: any) => s.similarity > 0.3) // Only return reasonably similar memories
+        .filter((s: any) => s.similarity > 0.3)
         .map((s: any) => s.content);
     }
 
-    // Fallback: return most recent memories
+
     const recent = await prisma.memory.findMany({
       take: limit,
       orderBy: { createdAt: "desc" },

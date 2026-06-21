@@ -50,13 +50,13 @@ export class LLMCacheManager {
    */
   public static async getCache(key: string): Promise<string | null> {
     try {
-      const entry = await prisma.lLMCache.findUnique({ // Wait, the model is LLMCache but in prisma client it might be lLMCache
+      const entry = await prisma.lLMCache.findUnique({
         where: { key },
       });
 
       if (!entry) return null;
 
-      // Async update stats without blocking
+
       prisma.lLMCache.update({
         where: { key },
         data: {
@@ -100,7 +100,6 @@ export class LLMCacheManager {
         },
       });
 
-      // Cleanup old cache entries lazily (older than 14 days)
       this.cleanupOldCache().catch(() => {});
     } catch (err) {
       console.warn("Failed to write to LLM Cache:", err);
@@ -124,14 +123,13 @@ export class LLMCacheManager {
       });
       if (!entry) return null;
 
-      // Check if it's within 1 hour
+
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
       if (entry.lastAccessedAt < oneHourAgo) {
         return null;
       }
       return entry.model;
-    } catch (e) {
-      console.error("GET WORKING MODEL ERR:", e);
+    } catch {
       return null;
     }
   }
@@ -155,9 +153,7 @@ export class LLMCacheManager {
           lastAccessedAt: new Date()
         }
       });
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   /**
@@ -173,7 +169,7 @@ export class LLMCacheManager {
       _sum: { hitCount: true },
     });
 
-    // Approximate storage by checking the database file size
+
     let storageBytes = 0;
     try {
       const fs = require("fs");

@@ -25,6 +25,19 @@ const DEFAULT_MODEL_PRIORITY = [
   "allam-2-7b"
 ];
 
+const getApiKeys = (prefix: string): string[] => {
+  const keys: string[] = [];
+  if (process.env[prefix]) {
+    keys.push(...process.env[prefix]!.split(',').map(k => k.trim()).filter(Boolean));
+  }
+  for (const [key, value] of Object.entries(process.env)) {
+    if (key.startsWith(`${prefix}_`) && typeof value === 'string' && value) {
+      keys.push(...value.split(',').map(k => k.trim()).filter(Boolean));
+    }
+  }
+  return [...new Set(keys)];
+};
+
 /**
  * Shared API call utility with exponential backoff retry and dynamic model fallbacks.
  *
@@ -50,7 +63,7 @@ export async function generateWithRetry(
     ? priorityString.split(",").map(s => s.trim()).filter(Boolean)
     : [...DEFAULT_MODEL_PRIORITY];
 
-  // Try to use the last successfully working model within the past hour
+
   const workingModel = await LLMCacheManager.getWorkingModel();
   if (workingModel && models.includes(workingModel)) {
     models.splice(models.indexOf(workingModel), 1);
@@ -63,7 +76,7 @@ export async function generateWithRetry(
     const isGemini = model.toLowerCase().startsWith("gemini");
     const provider = isGemini ? "gemini" : "groq";
     
-    // Check cache for this specific model
+
     let cacheInfo: ReturnType<typeof LLMCacheManager.generateCacheKey> | null = null;
     if (useCache) {
       cacheInfo = LLMCacheManager.generateCacheKey({
@@ -79,7 +92,7 @@ export async function generateWithRetry(
       }
     }
 
-    // Try API calls with retries
+
     let modelSuccess = false;
     let responseText = "";
 
@@ -90,8 +103,12 @@ export async function generateWithRetry(
         );
 
         if (isGemini) {
+          const geminiKeys = getApiKeys('GEMINI_API_KEY');
+          const keyToUse = geminiKeys.length > 0 ? geminiKeys[i % geminiKeys.length] : undefined;
+          const currentClient = (i > 0 && keyToUse) ? new GoogleGenAI({ apiKey: keyToUse }) : client;
+
           const response: any = await Promise.race([
-            client.models.generateContent({
+            currentClient.models.generateContent({
               model: model,
               contents: prompt,
             }),
@@ -99,11 +116,13 @@ export async function generateWithRetry(
           ]);
           responseText = response.text || "";
         } else {
-          const groqKey = process.env.GROQ_API_KEY;
-          if (!groqKey) {
+          const groqKeys = getApiKeys('GROQ_API_KEY');
+          const keyToUse = groqKeys.length > 0 ? groqKeys[i % groqKeys.length] : process.env.GROQ_API_KEY;
+          
+          if (!keyToUse) {
             throw new Error(`GROQ_API_KEY not set for model ${model}`);
           }
-          const groqClient = new Groq({ apiKey: groqKey });
+          const groqClient = new Groq({ apiKey: keyToUse });
           const response: any = await Promise.race([
             groqClient.chat.completions.create({
               model: model,
@@ -116,7 +135,7 @@ export async function generateWithRetry(
         }
 
         modelSuccess = true;
-        break; // Break the retry loop on success
+        break;
       } catch (err: any) {
         lastError = err;
         if (err.status === 503 || err.status === 429) {
@@ -124,14 +143,13 @@ export async function generateWithRetry(
           console.warn(`\n[${label}] API Busy (${model}). Retrying in ${delay / 1000}s...`);
           await new Promise((res) => setTimeout(res, delay));
         } else {
-          // Unrecoverable error for this model (e.g. invalid model, no API key)
           console.warn(`\n[${label}] Model ${model} failed/unavailable. Shifting to next...`);
-          break; // Break the retry loop, move to next model
+          break;
         }
       }
     }
 
-    // If the model succeeded, cache and return
+
     if (modelSuccess) {
       await LLMCacheManager.setWorkingModel(model);
       if (useCache && cacheInfo) {
@@ -147,7 +165,6 @@ export async function generateWithRetry(
       return responseText;
     }
     
-    // If it didn't succeed after retries, it will continue to the next model in the outer loop
     if (!modelSuccess && lastError?.status && (lastError.status === 503 || lastError.status === 429)) {
       console.warn(`\n[${label}] Exhausted retries for ${model}. Shifting to next...`);
     }

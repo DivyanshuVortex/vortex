@@ -38,8 +38,7 @@ export class CrossEncoderReranker {
   private static MODEL_NAME = "Xenova/ms-marco-MiniLM-L-6-v2";
 
   constructor() {
-    // Load the cross-encoder model in the background.
-    // First run downloads ~22MB to ~/.cache/huggingface
+
     this.modelPromise = pipeline(
       "text-classification",
       CrossEncoderReranker.MODEL_NAME,
@@ -67,8 +66,7 @@ export class CrossEncoderReranker {
 
     const model = await this.modelPromise;
 
-    // Cross-encoders expect input pairs: [query, document]
-    // We truncate content to avoid exceeding the model's 512 token limit
+
     const pairs = chunks.map((chunk) => ({
       text: query,
       text_pair: this.truncateForModel(chunk.content),
@@ -76,13 +74,13 @@ export class CrossEncoderReranker {
 
     const scored: ScoredChunk[] = [];
 
-    // Process in batches to avoid memory issues with large result sets
+
     const BATCH_SIZE = 16;
     for (let i = 0; i < pairs.length; i += BATCH_SIZE) {
       const batch = pairs.slice(i, i + BATCH_SIZE);
       const batchChunks = chunks.slice(i, i + BATCH_SIZE);
 
-      // Run each pair through the cross-encoder
+
       for (let j = 0; j < batch.length; j++) {
         try {
           const pair = batch[j]!;
@@ -90,8 +88,7 @@ export class CrossEncoderReranker {
             text_pair: pair.text_pair,
           });
 
-          // The cross-encoder outputs a single logit score
-          // Higher = more relevant
+
           const score = Array.isArray(result)
             ? (result[0] as any)?.score ?? 0
             : (result as any)?.score ?? 0;
@@ -102,7 +99,6 @@ export class CrossEncoderReranker {
             source: "reranker",
           });
         } catch (err) {
-          // If scoring fails for a chunk, assign a low score rather than crashing
           scored.push({
             chunk: batchChunks[j]!,
             score: -1,
@@ -112,7 +108,7 @@ export class CrossEncoderReranker {
       }
     }
 
-    // Sort by descending relevance score
+
     scored.sort((a, b) => b.score - a.score);
 
     return scored.slice(0, topK);

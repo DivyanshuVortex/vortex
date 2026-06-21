@@ -68,7 +68,6 @@ ${diff}
     `;
 
     try {
-      // Bypassing cache for extraction since it's just intermediate processing
       let result = await this.callLLM(prompt, { bypassCache: true });
       if (result.startsWith("\`\`\`")) {
         result = result.replace(/^\`\`\`[a-z]*\n/, "").replace(/\n\`\`\`$/, "");
@@ -169,7 +168,7 @@ ${fileContent}
 
     const result = await this.callLLM(prompt, {
       commitHash: this.getCurrentCommitHash(),
-      retrievalContextHash: crypto.createHash("sha256").update(fileContent).digest("hex") // hash the content directly for suggestions
+      retrievalContextHash: crypto.createHash("sha256").update(fileContent).digest("hex")
     });
     return result || "No suggestions generated.";
   }
@@ -189,10 +188,10 @@ ${fileContent}
 \`\`\`
     `;
 
-    let fixedCode = await this.callLLM(prompt, { bypassCache: true }); // AutoFix modifies files, DO NOT CACHE
+    let fixedCode = await this.callLLM(prompt, { bypassCache: true });
     if (!fixedCode) return fileContent;
     
-    // Strip markdown formatting if the model still outputs it
+
     if (fixedCode.startsWith("\`\`\`")) {
       fixedCode = fixedCode.replace(/^\`\`\`[a-z]*\n/, "").replace(/\n\`\`\`$/, "");
     }

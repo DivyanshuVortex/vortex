@@ -10,7 +10,7 @@ cacheCommand
   .action(async () => {
     try {
       const stats = await LLMCacheManager.getStats();
-      console.log("\n📊 LLM Cache Statistics\n");
+      console.log("\nLLM Cache Statistics\n");
       console.log(`Entries:    ${stats.entries.toLocaleString()}`);
       console.log(`Hits:       ${stats.hits.toLocaleString()}`);
       const storageMB = (stats.storage / 1024 / 1024).toFixed(2);

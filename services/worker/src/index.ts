@@ -5,9 +5,9 @@ import handleReviewPR from './jobs/reviewPR';
 
 const QUEUE_NAME = 'vortex-jobs';
 
-console.log(`🚀 Starting Vortex Worker... Listening on queue: ${QUEUE_NAME}`);
+console.log(`Starting Vortex Worker... Listening on queue: ${QUEUE_NAME}`);
 
-// Create the BullMQ Worker
+
 const worker = new Worker(
   QUEUE_NAME,
   async (job: Job) => {
@@ -29,14 +29,14 @@ const worker = new Worker(
 
 // Worker Events
 worker.on('completed', (job: Job) => {
-  console.log(`✅ [Job Completed] ${job.name} (ID: ${job.id})`);
+  console.log(`[Job Completed] ${job.name} (ID: ${job.id})`);
 });
 
 worker.on('failed', (job: Job | undefined, err: Error) => {
   if (job) {
-    console.error(`❌ [Job Failed] ${job.name} (ID: ${job.id}) - ${err.message}`);
+    console.error(`[Job Failed] ${job.name} (ID: ${job.id}) - ${err.message}`);
   } else {
-    console.error(`❌ [Job Failed] Unknown job - ${err.message}`);
+    console.error(`[Job Failed] Unknown job - ${err.message}`);
   }
 });
 
@@ -44,13 +44,11 @@ worker.on('error', (err: Error) => {
   console.error(`[Worker Error] ${err.message}`);
 });
 
-// Graceful Shutdown Handler
-// This ensures that if the server is restarted or crashes,
-// active AI processing jobs are given time to finish safely.
+
 async function gracefulShutdown(signal: string) {
-  console.log(`\n🛑 Received ${signal}, starting graceful shutdown...`);
+  console.log(`\nReceived ${signal}, starting graceful shutdown...`);
   
-  // Pause worker so it stops accepting new jobs from Redis
+
   try {
     await worker.close();
     console.log('Worker closed gracefully. All active jobs finished.');

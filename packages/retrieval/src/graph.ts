@@ -16,7 +16,7 @@ export class GraphRetriever {
 
     if (allIdentifiers.length === 0) return [];
 
-    // Combine all dependencies of focal chunks to find what they depend on
+
     const focalDependencies = new Set<string>();
     for (const chunk of chunks) {
       if (Array.isArray(chunk.dependencies)) {
@@ -28,7 +28,7 @@ export class GraphRetriever {
 
     const depArray = Array.from(focalDependencies);
 
-    // 1. Find chunks that the focal chunks depend on (Dependencies)
+
     const dependencies = await prisma.chunk.findMany({
       where: {
         OR: [
@@ -39,8 +39,6 @@ export class GraphRetriever {
       take: maxNeighbors,
     });
 
-    // 2. Find chunks that depend on the focal chunks (Dependents)
-    // We use Prisma's contains to search the JSON string for any identifier
     const dependentConditions = allIdentifiers.map((identifier) => ({
       dependencies: {
         contains: `"${identifier}"`,
@@ -54,11 +52,11 @@ export class GraphRetriever {
       take: maxNeighbors,
     });
 
-    // Merge and deduplicate
+
     const neighborMap = new Map<string, any>();
     
     for (const dbChunk of [...dependencies, ...dependents]) {
-      // Don't include focal chunks themselves
+
       if (chunks.some((c) => c.id === dbChunk.id)) continue;
       
       if (!neighborMap.has(dbChunk.id)) {
@@ -68,7 +66,7 @@ export class GraphRetriever {
 
     const neighbors = Array.from(neighborMap.values()).slice(0, maxNeighbors);
 
-    // Map to ScoredChunk format
+
     return neighbors.map((dbChunk) => {
       const chunk: Chunk = {
         id: dbChunk.id,
@@ -117,12 +115,21 @@ export class GraphRetriever {
 
     const sanitize = (str: string) => str.replace(/[^a-zA-Z0-9_]/g, "_");
 
+    const shortIds = new Map<string, string>();
+    let idCounter = 0;
+    const getId = (key: string) => {
+      if (!shortIds.has(key)) {
+        shortIds.set(key, `n${idCounter++}`);
+      }
+      return shortIds.get(key)!;
+    };
+
     if (!isDetailed) {
-      // File-level graph
+
       let mermaid = "flowchart LR\n";
       const files = Array.from(new Set(chunks.map(c => c.file))).sort();
       
-      // Find common prefix to make paths relative
+
       let commonPrefix: string = files.length > 0 ? files[0]! : "";
       for (const f of files) {
         let i = 0;
@@ -136,7 +143,7 @@ export class GraphRetriever {
         commonPrefix = commonPrefix.substring(0, lastSlash + 1);
       }
 
-      // Build tree
+
       interface DirNode {
         name: string;
         files: string[];
@@ -167,7 +174,7 @@ export class GraphRetriever {
         const color = colors[depth % colors.length];
         
         for (const [dirName, childNode] of Object.entries(node.dirs)) {
-          const sgId = sanitize(pathPrefix + dirName);
+          const sgId = getId(pathPrefix + dirName);
           result += `${indent}subgraph ${sgId}["${dirName}"]\n`;
           result += `${indent}  style ${sgId} fill:${color},stroke:#ecf0f1,stroke-width:2px,color:#fff,rx:5,ry:5\n`;
           result += renderNode(childNode, depth + 1, pathPrefix + dirName + "_");
@@ -176,7 +183,7 @@ export class GraphRetriever {
         
         for (const file of node.files) {
           const shortFile = file.split("/").pop() || file;
-          const fileId = sanitize(file);
+          const fileId = getId(file);
           result += `${indent}  ${fileId}["${shortFile}"]\n`;
           result += `${indent}  style ${fileId} fill:#34495E,stroke:#BDC3C7,stroke-width:1px,color:#fff,rx:3,ry:3\n`;
         }
@@ -189,12 +196,12 @@ export class GraphRetriever {
       const writtenEdges = new Set<string>();
 
       for (const chunk of chunks) {
-        const callerFileId = sanitize(chunk.file);
+        const callerFileId = getId(chunk.file);
 
         for (const dep of chunk.dependencies) {
           const callee = chunks.find(c => c.name === dep || c.symbolPath === dep);
           if (callee && callee.file !== chunk.file) {
-            const calleeFileId = sanitize(callee.file);
+            const calleeFileId = getId(callee.file);
             const edgeKey = `${callerFileId}->${calleeFileId}`;
             
             if (!writtenEdges.has(edgeKey)) {
@@ -212,7 +219,7 @@ export class GraphRetriever {
       return mermaid;
     }
 
-    // Find nodes matching the file filter
+
     const targetNodes = new Set<string>();
     
     if (file) {
@@ -222,10 +229,10 @@ export class GraphRetriever {
         }
       }
 
-      // Add neighbors to the target nodes
+
       for (const chunk of chunks) {
         if (targetNodes.has(chunk.id)) {
-          // Add dependencies of the target node
+
           for (const dep of chunk.dependencies) {
             const depMatch = chunks.find(c => c.name === dep || c.symbolPath === dep);
             if (depMatch) {
@@ -233,7 +240,7 @@ export class GraphRetriever {
             }
           }
         } else {
-          // Add dependents of the target node
+
           const dependsOnTarget = chunk.dependencies.some(dep => 
             Array.from(targetNodes).some(targetId => {
               const tc = chunks.find(c => c.id === targetId);
@@ -251,7 +258,7 @@ export class GraphRetriever {
     
     let mermaid = "flowchart LR\n";
 
-    // Group chunks by file to create subgraphs
+
     const chunksByFile = new Map<string, any[]>();
     for (const chunk of chunks) {
       if (!isNodeIncluded(chunk.id)) continue;
@@ -280,7 +287,7 @@ export class GraphRetriever {
       mermaid += `  end\n`;
     }
 
-    // Add edges
+
     const writtenEdges = new Set<string>();
 
     for (const chunk of chunks) {
@@ -323,7 +330,7 @@ export class GraphRetriever {
     }));
 
     if (!file) {
-      // For the whole project, just list files and their top-level symbols
+
       let tree = "📦 Project Dependencies\n";
       const files = Array.from(new Set(chunks.map(c => c.file))).sort();
       
@@ -341,7 +348,7 @@ export class GraphRetriever {
       return tree;
     }
 
-    // For a specific file, show target nodes, dependencies, and dependents
+
     const targetNodes = chunks.filter(c => c.file.includes(file));
     if (targetNodes.length === 0) return `No chunks found for file: ${file}`;
 
@@ -355,12 +362,12 @@ export class GraphRetriever {
 
       const prefix = isLastTarget ? "    " : "│   ";
 
-      // Find Dependencies (Callees)
+
       const dependencies = target.dependencies.map(dep => 
         chunks.find(c => c.name === dep || c.symbolPath === dep)
       ).filter(Boolean) as any[];
 
-      // Find Dependents (Callers)
+
       const dependents = chunks.filter(c => 
         c.dependencies.some(dep => dep === target.name || dep === target.symbolPath)
       );

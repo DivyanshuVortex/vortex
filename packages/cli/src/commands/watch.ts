@@ -6,7 +6,7 @@ export async function watchCommand(options: { deep?: boolean }) {
   const { default: chalk } = await import("chalk");
 
   console.log(
-    chalk.blue.bold("\n🌀 Vortex Live Watcher\n")
+    chalk.blue.bold("\nVortex Live Watcher\n")
   );
   console.log(
     chalk.gray("  Watching repository changes for live AI feedback...")
@@ -21,7 +21,7 @@ export async function watchCommand(options: { deep?: boolean }) {
   }
 
   const watcher = chokidar.watch(process.cwd(), {
-    ignored: /(^|[\/\\])\\..|node_modules|dist/, // ignore dotfiles, node_modules, dist
+    ignored: /(^|[\/\\])\\..|node_modules|dist/,
     persistent: true,
   });
 
@@ -32,7 +32,7 @@ export async function watchCommand(options: { deep?: boolean }) {
     if (isProcessing) return; // Debounce
 
     console.log(
-      chalk.cyan(`\n📝 Detected change in ${filePath}. Analyzing...`)
+      chalk.cyan(`\nDetected change in ${filePath}. Analyzing...`)
     );
     isProcessing = true;
 
@@ -52,5 +52,5 @@ export async function watchCommand(options: { deep?: boolean }) {
     }
   });
 
-  console.log(chalk.green("  ✅ Watcher started. Press Ctrl+C to exit.\n"));
+  console.log(chalk.green("  Watcher started. Press Ctrl+C to exit.\n"));
 }

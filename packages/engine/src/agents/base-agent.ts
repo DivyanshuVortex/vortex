@@ -56,14 +56,14 @@ export abstract class BaseAgent {
     const prompt = this.buildPrompt(input);
     let fullPrompt = `${this.systemPrompt}\n\n${prompt}`;
 
-    // If tools are registered, add tool descriptions and enter ReAct loop
+
     if (this.tools.length > 0) {
       fullPrompt += this.buildToolSection();
       const rawOutput = await this.reactLoop(fullPrompt, options);
       return this.parseOutput(rawOutput);
     }
 
-    // Simple mode: just prompt and parse
+
     const rawOutput = await this.generateWithRetry(fullPrompt);
     return this.parseOutput(rawOutput);
   }
@@ -99,24 +99,42 @@ export abstract class BaseAgent {
     let iterations = 0;
 
     while (iterations < this.maxToolIterations) {
-      const response = await this.generateWithRetry(currentPrompt);
+      let response = await this.generateWithRetry(currentPrompt);
 
-      // Check if the response contains a tool call
+
+      const hallucinationIndex = response.search(/\[(?:Tool Response|System)/);
+      if (hallucinationIndex !== -1) {
+        response = response.substring(0, hallucinationIndex).trim();
+      }
+
+
       const toolCall = this.extractToolCall(response);
 
       if (!toolCall) {
-        // No tool call — this is the final answer
+        if (hallucinationIndex !== -1) {
+          currentPrompt += `\n\n[System] You attempted to hallucinate a Tool Response. You must output the actual JSON tool call to use a tool. Please provide a valid JSON tool call or provide your FINAL_ANSWER.`;
+          iterations++;
+          continue;
+        }
+
+
+        if (response.includes("<think>") && !response.toLowerCase().includes("final") && !response.toLowerCase().includes("answer")) {
+          currentPrompt += `\n\n${response}\n\n[System] You provided a thought block but no valid JSON tool call. If you need to use a tool, output exactly the JSON format requested. If you are finished, please state your FINAL_ANSWER.`;
+          iterations++;
+          continue;
+        }
+
+
         return response;
       }
 
-      // Execute the tool
+
       if (options?.onToolCall) {
         options.onToolCall(toolCall.name, toolCall.args);
       }
       
       const tool = this.tools.find((t) => t.name === toolCall.name);
       if (!tool) {
-        // Tool not found — treat remaining response as final answer
         currentPrompt += `\n\n[System] Tool "${toolCall.name}" not found. Please provide your final answer without using tools.`;
         iterations++;
         continue;
@@ -133,12 +151,12 @@ export abstract class BaseAgent {
         options.onToolResult(toolCall.name, toolResult);
       }
 
-      // Append tool result to context and re-prompt
+
       currentPrompt += `\n\n[Tool Response from ${toolCall.name}]\n${toolResult}\n\nBased on this tool result, continue your analysis. You may call another tool or provide your FINAL_ANSWER.`;
       iterations++;
     }
 
-    // Max iterations reached — get final answer
+
     currentPrompt +=
       "\n\n[System] Maximum tool iterations reached. Please provide your FINAL_ANSWER now.";
     return this.generateWithRetry(currentPrompt);
@@ -155,12 +173,13 @@ export abstract class BaseAgent {
   private extractToolCall(
     response: string
   ): { name: string; args: Record<string, string> } | null {
-    // 1. Try to extract from a markdown code block
-    const jsonBlockMatch = response.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
-    let cleaned = (jsonBlockMatch && jsonBlockMatch[1]) ? jsonBlockMatch[1] : response;
+    const cleanResponse = response.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 
-    // 2. Wrap in array and parse if multiple objects exist (e.g. {}{})
-    // This handles the case where the LLM outputs multiple tool calls separated by whitespace/newlines
+
+    const jsonBlockMatch = cleanResponse.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+    let cleaned = (jsonBlockMatch && jsonBlockMatch[1]) ? jsonBlockMatch[1] : cleanResponse;
+
+
     const arrayWrapped = `[${cleaned.replace(/\}\s*\{/g, '},{')}]`;
     try {
       const parsedArray = JSON.parse(arrayWrapped);
@@ -178,7 +197,7 @@ export abstract class BaseAgent {
       // Fallthrough
     }
 
-    // 3. Try to find any single JSON object containing "tool_call"
+
     const objectMatch = cleaned.match(/\{[\s\S]*\}/);
     if (objectMatch) {
       try {
@@ -203,7 +222,7 @@ export abstract class BaseAgent {
       }
     }
 
-    // 4. Fallback regex if it's malformed but close
+
     const toolCallMatch = response.match(
       /\{"tool_call"\s*:\s*\{[\s\S]*?"name"\s*:\s*"([^"]+)"[\s\S]*\}\s*\}/
     );
@@ -213,11 +232,21 @@ export abstract class BaseAgent {
         const pathMatch = cleaned.match(/"path"\s*:\s*"([^"]+)"/);
         const contentMatch = cleaned.match(/"content"\s*:\s*"([\s\S]*)"\s*\}\s*\}/);
         if (pathMatch && contentMatch && pathMatch[1] && contentMatch[1]) {
+          let parsedContent = contentMatch[1];
+          try {
+            parsedContent = JSON.parse(`"${parsedContent}"`);
+          } catch {
+            parsedContent = parsedContent
+              .replace(/\\"/g, '"')
+              .replace(/\\n/g, '\n')
+              .replace(/\\t/g, '\t')
+              .replace(/\\r/g, '\r');
+          }
           return {
             name: "write_file",
             args: {
               path: pathMatch[1],
-              content: contentMatch[1].replace(/\\"/g, '"')
+              content: parsedContent
             } as Record<string, string>
           };
         }
@@ -226,10 +255,16 @@ export abstract class BaseAgent {
       if (cleaned.includes('"shell_execute"')) {
         const commandMatch = cleaned.match(/"command"\s*:\s*"([\s\S]*)"\s*\}\s*\}/);
         if (commandMatch && commandMatch[1]) {
+          let parsedCmd = commandMatch[1];
+          try {
+            parsedCmd = JSON.parse(`"${parsedCmd}"`);
+          } catch {
+            parsedCmd = parsedCmd.replace(/\\"/g, '"');
+          }
           return {
             name: "shell_execute",
             args: {
-              command: commandMatch[1].replace(/\\"/g, '"')
+              command: parsedCmd
             } as Record<string, string>
           };
         }
@@ -299,10 +334,10 @@ When you are done analyzing (with or without tools), provide your final structur
    */
   protected extractJSON<T>(response: string): T | null {
     try {
-      // Try direct parse first
+
       return JSON.parse(response) as T;
     } catch {
-      // Strip markdown code fences
+
       let cleaned = response;
       const jsonBlockMatch = cleaned.match(
         /```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/
@@ -311,7 +346,7 @@ When you are done analyzing (with or without tools), provide your final structur
         cleaned = jsonBlockMatch[1];
       }
 
-      // Try to find a JSON object in the text
+
       const objectMatch = cleaned.match(/\{[\s\S]*\}/);
       if (objectMatch) {
         try {

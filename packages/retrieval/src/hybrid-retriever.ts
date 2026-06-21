@@ -95,16 +95,16 @@ export class HybridRetriever {
     const useReranker = config?.useReranker ?? true;
     const useGraph = config?.useGraph ?? true;
 
-    // Stage 1 & 2: Run vector search and BM25 in parallel
+
     const [vectorResults, bm25Results] = await Promise.all([
       this.vectorSearch(query, candidatesPerMethod),
       this.bm25Search(query, candidatesPerMethod),
     ]);
 
-    // Stage 2.5: Graph Retrieval
+
     let graphResults: ScoredChunk[] = [];
     if (useGraph) {
-      // Find the top chunks from the initial results to use as focal points
+
       const initialFused = this.reciprocalRankFusion(vectorResults, bm25Results, [], 5);
       const focalChunks = initialFused.map((r) => r.chunk);
       if (focalChunks.length > 0) {
@@ -112,21 +112,21 @@ export class HybridRetriever {
       }
     }
 
-    // Merge results using Reciprocal Rank Fusion
+
     const fusedResults = this.reciprocalRankFusion(
       vectorResults,
       bm25Results,
       graphResults,
-      topK * 2 // Keep more candidates for the reranker
+      topK * 2
     );
 
-    // Stage 3: Rerank with cross-encoder (if enabled and we have results)
+
     if (useReranker && fusedResults.length > 0) {
       const chunksToRerank = fusedResults.map((r) => r.chunk);
       const reranked = await this.reranker.rerank(query, chunksToRerank, topK);
 
       return reranked.map((scored) => {
-        // Find which sources originally contributed this chunk
+
         const originalResult = fusedResults.find(
           (r) => r.chunk.id === scored.chunk.id
         );
@@ -152,7 +152,7 @@ export class HybridRetriever {
     limit: number
   ): Promise<ScoredChunk[]> {
     try {
-      // Embed the query
+
       const queryEmbeddings = await this.embedder.embedChunks([
         createQueryChunk(query),
       ]);
@@ -188,7 +188,7 @@ export class HybridRetriever {
 
       if (bm25Results.length === 0) return [];
 
-      // Look up full chunk data from the database for each BM25 hit
+
       const { prisma } = await import("@vortex/db");
       const chunkIds = bm25Results.map((r) => r.id);
 
@@ -258,7 +258,7 @@ export class HybridRetriever {
       { chunk: Chunk; score: number; sources: ("vector" | "bm25" | "graph")[] }
     >();
 
-    // Score vector results by rank
+
     vectorResults.forEach((result, rank) => {
       const rrfScore = 1 / (k + rank + 1);
       const existing = scoreMap.get(result.chunk.id);
@@ -275,7 +275,7 @@ export class HybridRetriever {
       }
     });
 
-    // Score BM25 results by rank
+
     bm25Results.forEach((result, rank) => {
       const rrfScore = 1 / (k + rank + 1);
       const existing = scoreMap.get(result.chunk.id);
@@ -292,7 +292,7 @@ export class HybridRetriever {
       }
     });
 
-    // Score Graph results by rank
+
     graphResults.forEach((result, rank) => {
       const rrfScore = 1 / (k + rank + 1);
       const existing = scoreMap.get(result.chunk.id);
@@ -309,7 +309,7 @@ export class HybridRetriever {
       }
     });
 
-    // Sort by combined RRF score and return top results
+
     const fused = Array.from(scoreMap.values()).sort(
       (a, b) => b.score - a.score
     );

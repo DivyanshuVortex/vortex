@@ -5,23 +5,26 @@ import * as path from "path";
 import * as dotenv from "dotenv";
 import * as os from "os";
 
-// Load environment variables manually to ensure strict precedence
-// 1. Global fallback
-dotenv.config({ path: path.resolve(os.homedir(), ".vortexenv") });
 
-// 2. Explicit local override (bypasses tsx/dotenv auto-load conflicts)
-// The .env file might be at the monorepo root (relative to __dirname) OR in the current working directory.
-const localEnvPaths = [
-  path.resolve(__dirname, "../../../.env"),
-  path.resolve(process.cwd(), ".env"),
-];
+const monorepoEnv = path.resolve(__dirname, "../../../.env");
+if (require("fs").existsSync(monorepoEnv)) {
+  const envConfig = dotenv.parse(require("fs").readFileSync(monorepoEnv));
+  for (const k in envConfig) {
+    if (k === "NODE_ENV") continue;
+    if (!process.env[k]) process.env[k] = envConfig[k];
+  }
+}
 
-for (const envPath of localEnvPaths) {
-  if (require("fs").existsSync(envPath)) {
-    const envConfig = dotenv.parse(require("fs").readFileSync(envPath));
-    for (const k in envConfig) {
-      process.env[k] = envConfig[k];
-    }
+
+dotenv.config({ path: path.resolve(os.homedir(), ".vortexenv"), override: true });
+
+
+const cwdEnv = path.resolve(process.cwd(), ".env");
+if (require("fs").existsSync(cwdEnv)) {
+  const envConfig = dotenv.parse(require("fs").readFileSync(cwdEnv));
+  for (const k in envConfig) {
+    if (k === "NODE_ENV") continue;
+    process.env[k] = envConfig[k];
   }
 }
 
@@ -94,7 +97,7 @@ program
   .description("Autonomously solve a task by writing code and executing commands")
   .argument("<prompt>", "The task you want the autonomous agent to solve")
   .option("--auto-approve", "Skip interactive prompts for file writes and shell commands")
-  .option("--max-steps <number>", "Maximum number of agent loop iterations", Number, 5)
+  .option("--max-steps <number>", "Maximum number of agent loop iterations", Number, 30)
   .option("--new-project <folder>", "Create a new project folder and initialize git before solving")
   .action((prompt, options) => solveCommand(prompt, options));
 
@@ -103,7 +106,7 @@ program
   .description("Autonomously solve a GitHub issue using local RAG context")
   .requiredOption("--id <number>", "Issue number", Number)
   .option("--auto-approve", "Skip interactive prompts for file writes and shell commands")
-  .option("--max-steps <number>", "Maximum number of agent loop iterations", Number, 5)
+  .option("--max-steps <number>", "Maximum number of agent loop iterations", Number, 30)
   .action(solveIssueCommand);
 
 // ── AI-Powered Commands ──

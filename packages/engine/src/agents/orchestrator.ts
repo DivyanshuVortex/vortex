@@ -53,10 +53,10 @@ export class ReviewOrchestrator {
    * Register tools across all agents that support self-verification.
    */
   public registerTools(tools: AgentTool[]): void {
-    // Security and architecture agents can use tools to verify findings
+
     this.securityAgent.registerTools(tools);
     this.architectureAgent.registerTools(tools);
-    // Synthesizer doesn't need tools — it only combines findings
+
   }
 
   /**
@@ -80,10 +80,7 @@ export class ReviewOrchestrator {
       memories,
     };
 
-    // ──────────────────────────────────────────────
-    // Stage 1: Run Security + Architecture in PARALLEL
-    // ──────────────────────────────────────────────
-    console.log("\n🔄 Running Security and Architecture agents in parallel...");
+    console.log("\nRunning Security and Architecture agents in parallel...");
 
     const [securityResult, architectureResult] = await Promise.all([
       this.runAgentSafe("SecurityAgent", () =>
@@ -108,16 +105,13 @@ export class ReviewOrchestrator {
     };
 
     console.log(
-      `  🛡️  Security: ${securityOutput.riskLevel} (${securityOutput.findings.length} findings)`
+      `  Security: ${securityOutput.riskLevel} (${securityOutput.findings.length} findings)`
     );
     console.log(
-      `  🏗️  Architecture: ${architectureOutput.consistencyScore} (${architectureOutput.findings.length} findings)`
+      `  Architecture: ${architectureOutput.consistencyScore} (${architectureOutput.findings.length} findings)`
     );
 
-    // ──────────────────────────────────────────────
-    // Stage 2: Run Synthesizer with combined outputs
-    // ──────────────────────────────────────────────
-    console.log("\n🔄 Synthesizing final review...");
+    console.log("\nSynthesizing final review...");
 
     const synthesisInput: AgentInput = {
       diff,
@@ -147,7 +141,7 @@ export class ReviewOrchestrator {
     const durationMs = Date.now() - startTime;
 
     console.log(
-      `\n✅ Review complete in ${(durationMs / 1000).toFixed(1)}s — Verdict: ${synthesisOutput.verdict}`
+      `\nReview complete in ${(durationMs / 1000).toFixed(1)}s | Verdict: ${synthesisOutput.verdict}`
     );
 
     return {
@@ -174,7 +168,7 @@ export class ReviewOrchestrator {
     try {
       return await fn();
     } catch (err) {
-      console.error(`\n⚠️ ${agentName} failed:`, err);
+      console.error(`\n${agentName} failed:`, err);
       return {
         agentName,
         findings: [],

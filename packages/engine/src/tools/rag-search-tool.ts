@@ -1,17 +1,15 @@
 import { AgentTool } from "./tool-types";
-import { VectorStore, LocalEmbedder } from "@vortex/retrieval";
+import { HybridRetriever } from "@vortex/retrieval";
 
 export class RagSearchTool implements AgentTool {
   name = "rag_search";
   description =
-    'Search the Project Memory (RAG) to recall what was written in previous files. Args: {"query": "What CSS classes are defined in style.css?"}. Returns the most relevant code chunks.';
+    'Search the Project Memory (RAG) to recall what was written in previous files or understand how files connect. Args: {"query": "What CSS classes are defined in style.css?"}. Returns the most relevant code chunks and their dependency graph context.';
 
-  private vectorStore: VectorStore;
-  private embedder: LocalEmbedder;
+  private hybridRetriever: HybridRetriever;
 
-  constructor(vectorStore: VectorStore, embedder: LocalEmbedder) {
-    this.vectorStore = vectorStore;
-    this.embedder = embedder;
+  constructor(hybridRetriever: HybridRetriever) {
+    this.hybridRetriever = hybridRetriever;
   }
 
   async execute(args: Record<string, string>): Promise<string> {
@@ -21,32 +19,7 @@ export class RagSearchTool implements AgentTool {
     }
 
     try {
-      // Create a dummy chunk to format the query for the embedder, 
-      // or we could just use the embedder directly on the query string.
-      // We will mock a chunk to get a good embedding representation
-      const queryEmbeddingOutput = await this.embedder.embedChunks([
-        {
-          id: "query",
-          file: "query",
-          language: "text",
-          name: "query",
-          symbolPath: "query",
-          kind: "function",
-          isExported: false,
-          isAsync: false,
-          dependencies: [],
-          startLine: 1,
-          endLine: 1,
-          hash: "query",
-          content: query,
-        }
-      ]);
-
-      const queryEmbedding = queryEmbeddingOutput[0];
-      if (!queryEmbedding) {
-        return "Error: Failed to generate embedding for query.";
-      }
-      const results = await this.vectorStore.search(queryEmbedding, 5);
+      const results = await this.hybridRetriever.search(query, { topK: 5 });
 
       if (results.length === 0) {
         return `No relevant memory found for query: "${query}".`;
@@ -54,7 +27,8 @@ export class RagSearchTool implements AgentTool {
 
       let response = `--- RAG Search Results for: "${query}" ---\n`;
       for (const result of results) {
-        response += `\n[File: ${result.file}]\n${result.content}\n`;
+        const c = result.chunk;
+        response += `\n[File: ${c.file} | Symbol: ${c.symbolPath || 'anonymous'}]\n${c.content}\n`;
       }
 
       return response;

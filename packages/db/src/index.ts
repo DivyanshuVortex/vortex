@@ -1,10 +1,15 @@
 import { PrismaClient } from "@prisma/client";
 import * as path from "path";
+export { findProjectRoot } from "./findRoot";
+import { findProjectRoot } from "./findRoot";
+
+const projectRoot = findProjectRoot(process.cwd());
+const dbPath = path.join(projectRoot, ".vortex.db");
 
 export const prisma = new PrismaClient({
   datasources: {
     db: {
-      url: `file:${path.resolve(process.cwd(), ".vortex.db")}`,
+      url: `file:${dbPath}`,
     },
   },
 });

@@ -17,7 +17,7 @@ export async function analyzeCommand(options: {
   });
 
   console.log(
-    chalk.blue.bold(`\n🌀 Analyzing External PR #${options.pr}\n`)
+    chalk.blue.bold(`\nAnalyzing External PR #${options.pr}\n`)
   );
 
   if (!process.env.GITHUB_TOKEN) {
@@ -62,7 +62,7 @@ export async function analyzeCommand(options: {
       margin: { top: 1, bottom: 1 },
       borderStyle: "double",
       borderColor: "magenta",
-      title: chalk.magenta.bold(" ✨ External PR Analysis "),
+      title: chalk.magenta.bold(" External PR Analysis "),
       titleAlignment: "center",
     });
 

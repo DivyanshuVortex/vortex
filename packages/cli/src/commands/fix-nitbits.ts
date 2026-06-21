@@ -9,7 +9,7 @@ export async function fixNitbitsCommand(options: {
   const { default: ora } = await import("ora");
   const { default: chalk } = await import("chalk");
 
-  console.log(chalk.blue.bold("\n🌀 Fixing Repository Nitbits\n"));
+  console.log(chalk.blue.bold("\nFixing Repository Nitbits\n"));
 
   if (!options.files) {
     console.error(
@@ -44,7 +44,7 @@ export async function fixNitbitsCommand(options: {
         console.log(chalk.gray(`\n--- END ---\n`));
       } else {
         fs.writeFileSync(file, fixedContent, "utf8");
-        spinner.succeed(chalk.green(`✅ Fixed and saved ${file}`));
+        spinner.succeed(chalk.green(`Fixed and saved ${file}`));
       }
 
       fixedCount++;

@@ -16,7 +16,7 @@ import {
 } from "@vortex/engine";
 import { initDatabase } from "@vortex/db";
 import { getGitRoot, isGitRepo } from "@vortex/git";
-import { VectorStore, LocalEmbedder } from "@vortex/retrieval";
+import { VectorStore, LocalEmbedder, BM25Index, HybridRetriever } from "@vortex/retrieval";
 
 export async function solveCommand(prompt: string, options: { autoApprove?: boolean; maxSteps?: number; contextChunks?: AgentContextChunk[]; newProject?: string } = {}) {
   let cwd = process.cwd();
@@ -25,7 +25,7 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
     const projectPath = path.resolve(cwd, options.newProject);
     if (!fs.existsSync(projectPath)) {
       fs.mkdirSync(projectPath, { recursive: true });
-      console.log(chalk.green(`\n📁 Created new project folder: ${projectPath}`));
+      console.log(chalk.green(`\nCreated new project folder: ${projectPath}`));
     }
     cwd = projectPath;
     process.chdir(cwd);
@@ -33,7 +33,7 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
     if (!fs.existsSync(path.join(cwd, ".git"))) {
       try {
         execSync("git init", { cwd, stdio: "ignore" });
-        console.log(chalk.green(`🌱 Initialized empty Git repository in ${cwd}`));
+        console.log(chalk.green(`Initialized empty Git repository in ${cwd}`));
       } catch (e) {
         console.error(chalk.red("Failed to initialize git repository."));
       }
@@ -46,7 +46,7 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
     rootPath = getGitRoot(cwd);
   }
 
-  console.log(`\n🤖 Vortex Autonomous Agent activated`);
+  console.log(`\nVortex Autonomous Agent activated`);
   console.log(`Task: "${prompt}"\n`);
 
   await initDatabase();
@@ -55,13 +55,13 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
 
   try {
     const vectorStore = new VectorStore();
+    const bm25Index = new BM25Index();
     const embedder = new LocalEmbedder();
+    const hybridRetriever = new HybridRetriever(vectorStore, bm25Index, embedder);
     const agent = new AutonomousAgent();
     
-    // Set max steps if provided
     if (options.maxSteps !== undefined) {
-      // @ts-ignore - access protected member for now until properly exposed
-      agent.maxToolIterations = options.maxSteps;
+      (agent as any).maxToolIterations = options.maxSteps;
     }
 
     spinner.text = "Thinking...";
@@ -89,13 +89,13 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
       return answer.toLowerCase() === "y" || answer.toLowerCase() === "yes";
     };
 
-    // Register all available tools
+
     agent.registerTools([
       new FileReadTool(rootPath),
       new FileWriteTool(rootPath, vectorStore, embedder, approvalCallback),
       new ShellExecuteTool(rootPath, approvalCallback),
       new GrepTool(rootPath),
-      new RagSearchTool(vectorStore, embedder),
+      new RagSearchTool(hybridRetriever),
     ]);
 
     const result = await agent.run(
@@ -117,10 +117,8 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
         },
         onToolResult: (toolName, toolResult) => {
           if (toolName === "write_file" && toolResult.startsWith("Success")) {
-            // After file write completes successfully, run git diff to show the changes inline
             spinner.stop();
             try {
-              // Extract the path from the toolResult if possible or simply rely on git diff
               const match = toolResult.match(/Wrote to (.*) successfully/);
               if (match && match[1]) {
                  const filePath = match[1];
@@ -131,7 +129,7 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
                  }
               }
             } catch (e) {
-               // git diff might fail if the file is untracked, ignore
+
             }
             spinner.start("Thinking...");
           }
@@ -141,21 +139,18 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
 
     spinner.succeed("Task completed");
     
-    // UI/UX Improvement: Show overall diff stat
     try {
       const statOut = execSync(`git diff --stat`, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] });
       if (statOut.trim()) {
         console.log(`\n${chalk.cyan('=== Changed Files Summary ===')}`);
         console.log(statOut);
       }
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
 
     console.log(`\n${chalk.cyan('=== Final Output ===')}\n`);
     console.log(result.summary);
 
-    // Verification Step
+
     const packageJsonPath = path.join(cwd, "package.json");
     if (fs.existsSync(packageJsonPath)) {
       try {
@@ -164,16 +159,16 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
           console.log(`\n${chalk.cyan('=== Verification ===')}`);
           const buildSpinner = ora("Running build command...").start();
           try {
-            execSync("npm run build", { stdio: "pipe", cwd });
+            const env = { ...process.env };
+            delete env.NODE_ENV;
+            execSync("npm run build", { stdio: "pipe", cwd, env });
             buildSpinner.succeed("Build completed successfully.");
           } catch (e: any) {
             buildSpinner.fail("Build failed.");
             console.error(chalk.red(e.stdout ? e.stdout.toString() : e.message));
           }
         }
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
     }
   } catch (err: any) {
     spinner.fail("Agent encountered an error");

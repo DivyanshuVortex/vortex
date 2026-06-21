@@ -33,12 +33,10 @@ export class BM25Index {
     this.index = new MiniSearch<BM25Document>({
       fields: ["name", "symbolPath", "content", "file"],
       storeFields: ["name", "symbolPath", "file", "kind"],
-      // Tokenizer: split on whitespace, dots, underscores, camelCase boundaries
+
       tokenize: (text: string) => {
         return text
-          // Insert space before uppercase letters in camelCase
           .replace(/([a-z])([A-Z])/g, "$1 $2")
-          // Split on non-alphanumeric characters
           .split(/[\s\W_]+/)
           .filter((token) => token.length > 1)
           .map((token) => token.toLowerCase());
@@ -60,21 +58,12 @@ export class BM25Index {
       kind: chunk.kind,
     }));
 
-    // MiniSearch throws if a document with the same ID already exists,
-    // so we discard duplicates silently.
-    const existingIds = new Set(
-      this.index.documentCount > 0
-        ? // MiniSearch doesn't expose a simple "has" check, so we track externally
-          []
-        : []
-    );
+    const existingIds = new Set([]);
 
     for (const doc of documents) {
       try {
         this.index.add(doc);
-      } catch {
-        // Document with this ID already exists — skip it
-      }
+      } catch {}
     }
   }
 
@@ -96,13 +85,9 @@ export class BM25Index {
    */
   public search(query: string, limit: number = 20): BM25SearchResult[] {
     const results = this.index.search(query, {
-      // Use prefix matching to handle partial queries (e.g., "calc" → "calculateMaxOffset")
       prefix: true,
-      // Fuzzy matching tolerance for typos (1 character edit distance)
       fuzzy: 0.2,
-      // Combine field scores using the sum (default is sum, but being explicit)
       combineWith: "OR",
-      // Boost function/symbol names much higher than raw content
       boost: {
         name: 5,
         symbolPath: 3,

@@ -15,8 +15,7 @@ export class VectorStore {
       throw new Error("Chunks and embeddings length mismatch or empty.");
     }
 
-    // Upsert to local SQLite using Prisma
-    // We stringify dependencies and embedding
+
     await prisma.$transaction(
       chunks.map((chunk, i) => 
         prisma.chunk.upsert({
@@ -62,7 +61,7 @@ export class VectorStore {
   }
 
   public async search(queryEmbedding: number[], limit: number = 5, filter?: SearchFilter): Promise<Chunk[]> {
-    // 1. Fetch chunks matching the metadata filters
+
     const whereClause: any = {};
     if (filter?.file) {
       whereClause.file = filter.file;
@@ -95,19 +94,17 @@ export class VectorStore {
 
     if (dbChunks.length === 0) return [];
 
-    // 2. Perform in-memory cosine similarity search
+
     const scoredChunks = dbChunks.map((dbChunk: any) => {
       let similarity = -1;
       if (dbChunk.embedding) {
         try {
           const chunkEmbedding = JSON.parse(dbChunk.embedding) as number[];
           similarity = cosineSimilarity(queryEmbedding, chunkEmbedding);
-        } catch(e) {
-            // Ignore parse errors, score remains -1
-        }
+        } catch(e) {}
       }
 
-      // Reconstruct Chunk format
+
       const chunk: Chunk = {
           id: dbChunk.id,
           file: dbChunk.file,
@@ -129,7 +126,7 @@ export class VectorStore {
       return { chunk, similarity };
     });
 
-    // 3. Sort by descending similarity and return top results
+
     scoredChunks.sort((a: any, b: any) => b.similarity - a.similarity);
     
     return scoredChunks.slice(0, limit).map((item: any) => ({

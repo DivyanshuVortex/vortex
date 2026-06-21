@@ -28,12 +28,18 @@ export class Indexer {
     const root = getGitRoot(cwd);
     console.log(`Starting indexing for repository at ${root}`);
 
-    // Ensure database tables are created in the local .vortex.db
+
     await initDatabase();
 
     const files = listTrackedFiles(root).filter(file => {
       const ext = path.extname(file);
-      return ['.ts', '.tsx', '.js', '.jsx'].includes(ext) && !file.includes('node_modules');
+      const supportedExts = [
+        '.ts', '.tsx', '.js', '.jsx',
+        '.py', '.go', '.rs', '.java',
+        '.cpp', '.hpp', '.c', '.h',
+        '.rb', '.php', '.html', '.css'
+      ];
+      return supportedExts.includes(ext) && !file.includes('node_modules');
     });
     console.log(`Found ${files.length} supported source files.`);
 
@@ -48,11 +54,11 @@ export class Indexer {
           continue;
         }
 
-        // Build vector embeddings
+
         const embeddings = await this.embedder.embedChunks(chunks);
         await this.store.upsert(chunks, embeddings);
 
-        // Add to BM25 keyword index
+
         this.bm25Index.addDocuments(chunks);
 
         totalChunks += chunks.length;
@@ -61,7 +67,7 @@ export class Indexer {
       }
     }
 
-    // Persist BM25 index to disk
+
     const bm25Path = path.join(cwd, ".vortex-bm25.json");
     try {
       const indexData = this.bm25Index.exportIndex();
@@ -72,9 +78,9 @@ export class Indexer {
     }
 
     console.log(`\nIndexing complete.`);
-    console.log(`  📊 Files processed: ${files.length}`);
-    console.log(`  🧩 Chunks indexed: ${totalChunks}`);
-    console.log(`  📝 BM25 documents: ${this.bm25Index.documentCount}`);
+    console.log(`  Files processed: ${files.length}`);
+    console.log(`  Chunks indexed: ${totalChunks}`);
+    console.log(`  BM25 documents: ${this.bm25Index.documentCount}`);
 
     return {
       filesProcessed: files.length,
@@ -89,7 +95,6 @@ export class Indexer {
   async search(query: string, limit: number = 5): Promise<any[]> {
     console.log(`Generating embedding for query: "${query}"...`);
     await initDatabase();
-    // Create a dummy chunk to embed the query
     const queryEmbedding = await this.embedder.embedChunks([
       createQueryChunk(query),
     ]);
@@ -113,7 +118,6 @@ export class Indexer {
    */
   async hybridSearch(query: string, limit: number = 10): Promise<any[]> {
     await initDatabase();
-    // Load persisted BM25 index if the in-memory one is empty
     if (this.bm25Index.documentCount === 0) {
       const bm25Path = path.join(process.cwd(), ".vortex-bm25.json");
       if (fs.existsSync(bm25Path)) {

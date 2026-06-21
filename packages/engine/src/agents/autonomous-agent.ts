@@ -10,7 +10,7 @@ import { AgentInput, AgentOutput } from "./types";
 export class AutonomousAgent extends BaseAgent {
   name = "Vortex";
   
-  // Override max iterations to allow for long-running autonomous tasks (increased from 15 to 30)
+
   protected maxToolIterations = 30;
 
   readonly systemPrompt = `You are Vortex Autonomous, an elite AI software engineer.
@@ -37,7 +37,6 @@ Once you have completely finished the task and verified that the entire project 
   protected buildPrompt(input: AgentInput): string {
     const { diff, contextChunks } = input;
     
-    // In autonomous mode, the "diff" field might just be the user's prompt/task.
     let prompt = `USER TASK:\n${diff}\n`;
 
     if (contextChunks && contextChunks.length > 0) {
@@ -51,8 +50,6 @@ Once you have completely finished the task and verified that the entire project 
   }
 
   protected parseOutput(rawResponse: string): AgentOutput {
-    // We don't enforce strict JSON for the final answer of the autonomous agent, 
-    // we just return the raw text wrapped in the expected format.
     return {
       agentName: this.name,
       summary: rawResponse,

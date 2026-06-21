@@ -37,7 +37,6 @@ export async function issueCommand(options: any) {
 
     spinner.text = `Issue fetched. Searching local vector database for relevant code...`;
     
-    // Perform RAG lookup using the issue title as the query!
     const indexer = new Indexer();
     const relevantContext = await indexer.search(issue.title, 5);
 
@@ -60,14 +59,14 @@ export async function issueCommand(options: any) {
       margin: { top: 1, bottom: 1 },
       borderStyle: 'double',
       borderColor: 'green',
-      title: chalk.green.bold(' ✨ AI Issue Analyzer '),
+      title: chalk.green.bold(' AI Issue Analyzer '),
       titleAlignment: 'center'
     });
 
     console.log(formatted);
     
     if (relevantContext.length > 0) {
-      console.log(chalk.cyan.dim(" 📚 Relevant Code Files Discovered"));
+      console.log(chalk.cyan.dim(" Relevant Code Files Discovered"));
       relevantContext.forEach((res: any, i: number) => {
          console.log(chalk.gray(`  │ [${i + 1}] ${res.file.replace(process.cwd(), '')} ➔ ${res.symbolPath || '(anonymous)'} (${res.score ? (res.score * 100).toFixed(1) + '%' : 'N/A'})`));
       });

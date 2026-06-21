@@ -17,7 +17,7 @@ export async function suggestCommand(options: {
   });
 
   console.log(
-    chalk.blue.bold(`\n🌀 Generating Suggestions for: ${options.file}\n`)
+    chalk.blue.bold(`\nGenerating Suggestions for: ${options.file}\n`)
   );
 
   if (!fs.existsSync(options.file)) {
@@ -42,7 +42,7 @@ export async function suggestCommand(options: {
       margin: { top: 1, bottom: 1 },
       borderStyle: "double",
       borderColor: "cyan",
-      title: chalk.cyan.bold(" ✨ AI Code Suggestions "),
+      title: chalk.cyan.bold(" AI Code Suggestions "),
       titleAlignment: "center",
     });
 
