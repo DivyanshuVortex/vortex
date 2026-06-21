@@ -19,10 +19,17 @@ npm install -g vortex-cli
 
 ### Configuration
 
-Vortex requires an API key for its LLM engine (e.g., Google Gemini or Groq). Set up a global configuration in your home directory:
+Vortex requires an API key for its LLM engine (e.g., Google Gemini or Groq). You can easily configure your keys globally using the `config` command:
 
 ```bash
-echo "GEMINI_API_KEY=your_gemini_key_here" > ~/.vortexenv
+# Add your Gemini API key
+vortex config set gemini "your_gemini_key_here"
+
+# Add your Groq API key
+vortex config set groq "your_groq_key_here"
+
+# View your active configuration
+vortex config list
 ```
 
 You can also use project-specific `.env` files or inline environment variables.

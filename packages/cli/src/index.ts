@@ -5,6 +5,9 @@ import * as path from "path";
 import * as dotenv from "dotenv";
 import * as os from "os";
 
+// Suppress dotenv logging
+process.env.DOTENV_CONFIG_QUIET = "true";
+
 
 const monorepoEnv = path.resolve(__dirname, "../../../.env");
 if (require("fs").existsSync(monorepoEnv)) {
@@ -39,13 +42,16 @@ import { analyzeCommand } from "./commands/analyze";
 import { solveCommand } from "./commands/solve";
 import { solveIssueCommand } from "./commands/solve-issue";
 import { cacheCommand } from "./commands/cache";
+import { configSet, configGet, configList } from "./commands/config";
 
 const program = new Command();
+
+const { version } = require("../package.json");
 
 program
   .name("vortex")
   .description("Developer Intelligence & PR Review Engine")
-  .version("0.1.0");
+  .version(version);
 
 program.hook("preAction", (thisCommand, actionCommand) => {
   if (actionCommand.opts().cache === false) {
@@ -134,6 +140,25 @@ program
   .option("--deep", "Enable advanced PR intelligence analysis")
   .option("--no-cache", "Disable LLM response caching")
   .action(analyzeCommand);
+
+const configCmd = program
+  .command("config")
+  .description("Manage global configuration and API keys");
+
+configCmd
+  .command("set <provider> <key>")
+  .description("Set an API key for a specific provider (gemini or groq)")
+  .action(configSet);
+
+configCmd
+  .command("get <key>")
+  .description("Get a global configuration value")
+  .action(configGet);
+
+configCmd
+  .command("list")
+  .description("List all global configuration values")
+  .action(configList);
 
 program.addCommand(cacheCommand);
 

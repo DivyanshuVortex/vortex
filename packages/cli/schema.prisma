@@ -1,0 +1,70 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./vortex.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Chunk {
+  id           String   @id
+  file         String
+  language     String
+  name         String
+  symbolPath   String
+  kind         String
+  parent       String?
+  isExported   Boolean
+  isAsync      Boolean
+  signature    String?
+  dependencies String   // Stringified JSON array
+  startLine    Int
+  endLine      Int
+  hash         String
+  content      String
+  embedding    String?  // Stringified JSON array of floats
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+/// Persistent memory entries for architectural decisions, known bugs,
+/// and review summaries. Enables Vortex to recall past context.
+model Memory {
+  id        String   @id @default(cuid())
+  type      String   // "review_summary" | "architectural_decision" | "known_bug"
+  content   String   // The actual memory text
+  source    String   // e.g., "PR #42", "issue #15", "manual"
+  tags      String   // JSON array of tags for search
+  embedding String?  // Stringified JSON array for vector search over memories
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Historical review records for tracking past PR reviews.
+/// Enables "Have we seen this pattern before?" queries.
+model ReviewHistory {
+  id         String   @id @default(cuid())
+  prNumber   Int
+  owner      String
+  repo       String
+  verdict    String   // SAFE_TO_MERGE | REQUIRES_CHANGES | NEEDS_DISCUSSION
+  summary    String   // Short summary of the review
+  findings   String   // JSON - full structured findings
+  createdAt  DateTime @default(now())
+}
+
+/// Cache for LLM responses to reduce latency and API cost
+model LLMCache {
+  key            String   @id
+  model          String
+  response       String
+
+  promptHash     String
+  contextHash    String
+  commitHash     String?
+
+  createdAt      DateTime @default(now())
+  lastAccessedAt DateTime @default(now())
+  hitCount       Int      @default(0)
+}
