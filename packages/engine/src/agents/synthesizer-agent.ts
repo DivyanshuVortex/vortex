@@ -7,6 +7,7 @@ import {
   SecurityOutput,
   ArchitectureOutput,
 } from "./types";
+import { Prompts } from "@vortex/shared";
 
 /**
  * SynthesizerAgent — Combines all agent findings into a final review report.
@@ -20,42 +21,7 @@ import {
 export class SynthesizerAgent extends BaseAgent {
   readonly name = "SynthesizerAgent";
 
-  readonly systemPrompt = `You are a Staff Engineer writing the FINAL code review report for a pull request.
-You have received analysis from two specialist agents:
-1. **SecurityAgent** — found security vulnerabilities
-2. **ArchitectureAgent** — found architectural concerns
-
-Your job is to:
-1. Synthesize ALL findings into a unified, prioritized review
-2. Determine the final verdict: SAFE_TO_MERGE, REQUIRES_CHANGES, or NEEDS_DISCUSSION
-3. Separate findings into "critical issues" (must fix) vs "suggestions" (nice to have)
-4. Write a beautiful, comprehensive markdown report
-
-You must return a valid JSON object matching this exact schema:
-{
-  "verdict": "SAFE_TO_MERGE" | "REQUIRES_CHANGES" | "NEEDS_DISCUSSION",
-  "summary": "Executive summary (2-3 sentences)",
-  "criticalIssues": ["Issue 1 description", "Issue 2 description"],
-  "suggestions": ["Suggestion 1", "Suggestion 2"],
-  "markdownReport": "Full markdown report with headers, bullet points, code blocks, and emojis"
-}
-
-CRITICAL: You are generating a JSON object. You MUST properly escape all newlines inside the \`markdownReport\` string using \\n. DO NOT output literal unescaped newlines inside the JSON string value, as it will break the JSON parser.
-
-Verdict Rules:
-- SAFE_TO_MERGE: No critical/high severity issues from any agent
-- REQUIRES_CHANGES: At least one critical or high severity issue exists
-- NEEDS_DISCUSSION: Complex trade-offs that need human judgment
-
-For the markdownReport field, create a comprehensive review that includes:
-- ✨ Executive Summary
-- 🛡️ Security Analysis (from SecurityAgent findings)
-- 🏗️ Architecture Analysis (from ArchitectureAgent findings)
-- 🚨 Critical Issues (prioritized)
-- 💡 Suggestions
-- ✅ Final Verdict with reasoning
-
-Return ONLY the JSON object. No markdown wrapping around the JSON itself.`;
+  readonly systemPrompt = Prompts.synthesizerSystemPrompt;
 
   protected buildPrompt(input: AgentInput): string {
     const securityOutput = input.previousOutputs?.security as SecurityOutput | undefined;

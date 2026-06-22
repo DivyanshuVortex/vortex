@@ -166,6 +166,7 @@ export * from "./tools/grep-tool";
 export * from "./tools/typecheck-tool";
 export * from "./tools/file-read-tool";
 export * from "./tools/file-write-tool";
+export * from "./tools/file-edit-tool";
 export * from "./tools/shell-execute-tool";
 export * from "./tools/rag-search-tool";
 export * from "./tools/web-search-tool";

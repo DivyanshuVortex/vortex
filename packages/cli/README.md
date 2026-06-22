@@ -28,6 +28,9 @@ vortex config set gemini "your_gemini_key_here"
 # Add your Groq API key
 vortex config set groq "your_groq_key_here"
 
+# Add your OpenRouter API key (fallback provider)
+vortex config set openrouter "your_openrouter_key_here"
+
 # View your active configuration
 vortex config list
 ```
@@ -57,6 +60,8 @@ vortex review --pr 42
 - **`vortex search -q <query>`**: Semantic, natural language code search backed by AI explanations.
 - **`vortex issue --id <id>`**: Analyzes GitHub issues and proposes step-by-step local code fixes.
 - **`vortex graph`**: Automatically generates Mermaid dependency graphs of your files or entire project.
+
+*Note: The CLI is deeply optimized for performance. We recently pruned obsolete commands to focus purely on autonomous intelligence.*
 
 
 *Note: Most read-only analysis commands automatically cache LLM requests to speed up subsequent runs and save API costs.*
@@ -93,7 +98,7 @@ Instead of passing code blindly to an LLM, Vortex uses specialized agents:
 - **Security Agent**: Scans for vulnerabilities and insecure patterns.
 - **Architecture Agent**: Checks code for design consistency against your repo's existing patterns.
 - **Synthesizer Agent**: Combines outputs into an actionable, unified review.
-- **Base Agent (ReAct Loop)**: An autonomous loop that can execute file system tools, read code, and run terminal commands to iteratively solve tasks.
+- **Base Agent (ReAct Loop)**: An autonomous loop that can execute file system tools, read code, search the web for missing library schemas, and run terminal commands to iteratively solve tasks.
 
 ### Memory & Retrieval
 Vortex utilizes a multi-layered memory architecture to maintain context without exceeding token limits or sacrificing privacy.

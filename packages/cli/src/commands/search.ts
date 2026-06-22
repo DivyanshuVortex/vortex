@@ -23,7 +23,7 @@ export async function searchCommand(options: any) {
       return;
     }
     
-    spinner.text = `Found ${results.length} relevant code chunks. Analyzing with Gemini...`;
+    spinner.text = `Found ${results.length} relevant code chunks. Analyzing with AI engine...`;
     
     const memoryService = new MemoryService();
     const memories = await memoryService.recallRelevantMemories(options.query, 3);

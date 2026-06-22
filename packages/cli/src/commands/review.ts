@@ -68,9 +68,13 @@ export async function reviewCommand(options: any) {
     const diffLines = diff.split('\n').filter(l => l.startsWith('+++') || l.startsWith('---')).length / 2 || 1;
     spinner.succeed(`Fetched diff  ·  ~${Math.floor(diffLines)} files changed`);
 
-    spinner.start("Extracting architectural queries from diff...");
     const agent = new IntelligenceAgent();
     const indexer = new Indexer();
+
+    spinner.start("Scanning repository and building indices for fresh context...");
+    await indexer.indexRepository(process.cwd());
+
+    spinner.start("Extracting architectural queries from diff...");
 
     const queries = await agent.extractSearchQueriesFromDiff(diff);
 

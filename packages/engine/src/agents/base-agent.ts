@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { AgentInput, AgentOutput, AgentState } from "./types";
 import { AgentTool } from "../tools/tool-types";
 import { generateWithRetry as sharedGenerateWithRetry } from "../llm";
+import { Prompts } from "@vortex/shared";
 
 /**
  * BaseAgent — Abstract foundation for all Vortex agents.
@@ -287,17 +288,20 @@ export abstract class BaseAgent {
     const jsonBlockMatch = cleanResponse.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
     let cleaned = (jsonBlockMatch && jsonBlockMatch[1]) ? jsonBlockMatch[1] : cleanResponse;
 
-    const arrayWrapped = `[${cleaned.replace(/\}\s*\{/g, '},{')}]`;
+    let toParse = cleaned.trim();
+    if (toParse.startsWith('{') && toParse.endsWith('}') && toParse.includes('}{')) {
+      toParse = `[${toParse.replace(/\}\s*\{/g, '},{')}]`;
+    }
+    
     try {
-      const parsedArray = JSON.parse(arrayWrapped);
-      if (Array.isArray(parsedArray)) {
-        for (const item of parsedArray) {
-          if (item && item.tool_call && item.tool_call.name) {
-            calls.push({
-              name: item.tool_call.name,
-              args: item.tool_call.args || {},
-            });
-          }
+      const parsedObj = JSON.parse(toParse);
+      const items = Array.isArray(parsedObj) ? parsedObj : [parsedObj];
+      for (const item of items) {
+        if (item && item.tool_call && item.tool_call.name) {
+          calls.push({
+            name: item.tool_call.name,
+            args: item.tool_call.args || {},
+          });
         }
       }
     } catch { }
@@ -335,7 +339,8 @@ export abstract class BaseAgent {
     const fallbackParser = () => {
       if (cleaned.includes('"write_file"')) {
         const pathMatch = cleaned.match(/"path"\s*:\s*"([^"]+)"/);
-        const contentMatch = cleaned.match(/"content"\s*:\s*"([\s\S]*)"\s*\}\s*\}/);
+        // Use a less greedy match or one that stops before the next tool call
+        const contentMatch = cleaned.match(/"content"\s*:\s*"([\s\S]*?)"\s*\}\s*\}[\s,\[\]]*(?:\{"tool_call"|$)/);
         if (pathMatch && contentMatch && pathMatch[1] && contentMatch[1]) {
           let parsedContent = contentMatch[1];
           try {
@@ -393,28 +398,7 @@ export abstract class BaseAgent {
       .map((tool) => `- **${tool.name}**: ${tool.description}`)
       .join("\n");
 
-    return `
-
-## Available Tools
-You have access to the following tools. To use a tool, you MUST use EXACTLY one of the following formats:
-
-Format 1 (JSON):
-\`\`\`json
-{"tool_call": {"name": "tool_name", "args": {"arg1": "value1"}}}
-\`\`\`
-
-Format 2 (XML):
-<tool_call> tool_name
-<arg_key>arg1</arg_key>
-<arg_value>value1</arg_value>
-</tool_call>
-
-IMPORTANT: You may emit multiple tool calls at once by formatting them as a JSON array or consecutive XML blocks. Use this to batch operations and gather evidence quickly.
-
-${toolDescriptions}
-
-When you are done analyzing (with or without tools), provide your final structured JSON output.
-`;
+    return "\n\n## Available Tools\n" + Prompts.baseAgentTools(toolDescriptions);
   }
 
   protected async generateWithRetry(

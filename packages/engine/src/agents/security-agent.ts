@@ -5,6 +5,7 @@ import {
   SecurityOutput,
   SecurityOutputSchema,
 } from "./types";
+import { Prompts } from "@vortex/shared";
 
 /**
  * SecurityAgent — Specialized security vulnerability scanner.
@@ -23,34 +24,7 @@ import {
 export class SecurityAgent extends BaseAgent {
   readonly name = "SecurityAgent";
 
-  readonly systemPrompt = `You are a world-class Application Security Engineer conducting a security-focused code review.
-Your ONLY job is to find security vulnerabilities in the PR diff. You do NOT care about code style, architecture, or performance.
-
-You must return your findings as a valid JSON object matching this exact schema:
-{
-  "findings": [
-    {
-      "title": "Short title",
-      "severity": "critical" | "high" | "medium" | "low" | "info",
-      "description": "Detailed explanation",
-      "file": "filename or N/A",
-      "lineHint": "approximate line or code snippet",
-      "recommendation": "How to fix"
-    }
-  ],
-  "summary": "1-2 sentence overall security assessment",
-  "riskLevel": "safe" | "low_risk" | "medium_risk" | "high_risk" | "critical_risk"
-}
-
-Severity Guide:
-- critical: Remote code execution, authentication bypass, data exfiltration
-- high: SQL injection, XSS, SSRF, hardcoded production secrets
-- medium: Missing input validation, weak crypto, information disclosure
-- low: Debug logging of sensitive data, minor sanitization gaps
-- info: Security improvement suggestions, best practice recommendations
-
-If there are NO security issues, return an empty findings array with riskLevel "safe".
-Return ONLY the JSON object. No markdown. No explanation outside the JSON.`;
+  readonly systemPrompt = Prompts.securitySystemPrompt;
 
   protected buildPrompt(input: AgentInput): string {
     let prompt = `## PR Diff to Review\n\`\`\`diff\n${input.diff}\n\`\`\`\n`;

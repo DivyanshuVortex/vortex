@@ -5,6 +5,7 @@ import {
   ArchitectureOutput,
   ArchitectureOutputSchema,
 } from "./types";
+import { Prompts } from "@vortex/shared";
 
 /**
  * ArchitectureAgent — Specialized codebase architecture reviewer.
@@ -22,41 +23,7 @@ import {
 export class ArchitectureAgent extends BaseAgent {
   readonly name = "ArchitectureAgent";
 
-  readonly systemPrompt = `You are a Principal Software Architect reviewing a pull request for ARCHITECTURAL CONSISTENCY.
-Your ONLY job is to compare the PR diff against the provided codebase context chunks and identify architectural concerns.
-You do NOT care about security vulnerabilities — a separate agent handles that.
-
-Focus exclusively on:
-1. Does the PR follow the existing patterns and conventions visible in the context chunks?
-2. Does it break any existing API contracts or interfaces?
-3. Are naming conventions consistent with the codebase?
-4. Does the dependency direction make sense (e.g., core packages shouldn't depend on CLI packages)?
-5. Is error handling consistent with existing patterns?
-6. Are there missing or premature abstractions?
-
-You must return your findings as a valid JSON object matching this exact schema:
-{
-  "findings": [
-    {
-      "title": "Short title",
-      "severity": "breaking" | "major" | "minor" | "suggestion",
-      "description": "Detailed explanation",
-      "affectedPattern": "Which existing pattern is affected",
-      "recommendation": "How to align with existing architecture"
-    }
-  ],
-  "summary": "1-2 sentence overall architecture assessment",
-  "consistencyScore": "excellent" | "good" | "fair" | "poor"
-}
-
-Severity Guide:
-- breaking: Changes that will break existing consumers of an API or interface
-- major: Significant pattern violations that make the code harder to maintain
-- minor: Small inconsistencies that should ideally be fixed
-- suggestion: Not a problem, but could be improved for better alignment
-
-If the PR is architecturally consistent, return an empty findings array with consistencyScore "excellent".
-Return ONLY the JSON object. No markdown. No explanation outside the JSON.`;
+  readonly systemPrompt = Prompts.architectureSystemPrompt;
 
   protected buildPrompt(input: AgentInput): string {
     let prompt = `## PR Diff to Review\n\`\`\`diff\n${input.diff}\n\`\`\`\n`;

@@ -8,6 +8,7 @@ import {
   AutonomousAgent,
   FileReadTool,
   FileWriteTool,
+  FileEditTool,
   ShellExecuteTool,
   GrepTool,
   RagSearchTool,
@@ -114,6 +115,10 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
 
     spinner.stopAndPersist({ symbol: chalk.green('✔'), text: `Plan ready  ·  ${planSummary}  (${stepCount} steps)\n` });
 
+    console.log(`\n${chalk.cyan.dim("─── Execution Plan ───")}`);
+    console.log(chalk.gray(executionPlan));
+    console.log(`${chalk.cyan.dim("──────────────────────")}\n`);
+
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     const answer = await rl.question(`  Proceed? (Y/n/edit) › `);
 
@@ -161,6 +166,7 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
     agent.registerTools([
       new FileReadTool(rootPath),
       new FileWriteTool(rootPath, vectorStore, embedder, approvalCallback),
+      new FileEditTool(rootPath, vectorStore, embedder, approvalCallback),
       new ShellExecuteTool(rootPath, approvalCallback),
       new GrepTool(rootPath),
       new RagSearchTool(hybridRetriever),
