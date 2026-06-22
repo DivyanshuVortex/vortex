@@ -1,6 +1,6 @@
 {
   "name": "@vortex-ai/cli",
-  "version": "0.1.45",
+  "version": "0.1.50",
   "description": "Vortex CLI - The main entry point",
   "main": "./dist/index.js",
   "bin": {

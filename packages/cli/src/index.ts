@@ -89,6 +89,7 @@ program
   .description("Search the indexed codebase semantically and get an AI explanation")
   .requiredOption("-q, --query <text>", "Search query")
   .option("-l, --limit <number>", "Number of results to consider", "5")
+  .option("--expand-query", "Expand the search query using the LLM for better recall")
   .option("--no-cache", "Disable LLM response caching")
   .action(searchCommand);
 
@@ -121,6 +122,7 @@ program
   .option("--auto-approve", "Skip interactive prompts for file writes and shell commands")
   .option("--max-steps <number>", "Maximum number of agent loop iterations", Number, 30)
   .option("--new-project <folder>", "Create a new project folder and initialize git before solving")
+  .option("--verify [command]", "Run a verification command after completion (e.g., 'npm run check-types'). Agent will self-correct on failure.")
   .action((prompt, options) => solveCommand(prompt, options));
 
 program
@@ -129,6 +131,7 @@ program
   .requiredOption("--id <number>", "Issue number", Number)
   .option("--auto-approve", "Skip interactive prompts for file writes and shell commands")
   .option("--max-steps <number>", "Maximum number of agent loop iterations", Number, 30)
+  .option("--verify [command]", "Run a verification command after completion. Agent will self-correct on failure.")
   .action(solveIssueCommand);
 
 // ── AI-Powered Commands ──

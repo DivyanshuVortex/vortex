@@ -59,7 +59,8 @@ Please fix this issue in the codebase.`;
     await solveCommand(prompt, {
       autoApprove: options.autoApprove,
       maxSteps: options.maxSteps,
-      contextChunks: contextChunks
+      contextChunks: contextChunks,
+      verify: options.verify
     });
 
   } catch (err) {

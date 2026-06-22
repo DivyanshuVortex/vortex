@@ -12,6 +12,7 @@ export interface CacheKeyParams {
 }
 
 export class LLMCacheManager {
+  private static sessionCache = new Map<string, Promise<string>>();
   /**
    * Generates a deterministic SHA-256 cache key.
    */
@@ -35,7 +36,6 @@ export class LLMCacheManager {
           model: params.model,
           promptHash,
           contextHash,
-          commitHash: params.commitHash || null,
           temperature: params.temperature || 0,
         })
       )
@@ -49,12 +49,19 @@ export class LLMCacheManager {
    * Updates lastAccessedAt and hitCount on cache hit.
    */
   public static async getCache(key: string): Promise<string | null> {
+    if (this.sessionCache.has(key)) {
+      return this.sessionCache.get(key) || null;
+    }
+
     try {
       const entry = await prisma.lLMCache.findUnique({
         where: { key },
       });
 
       if (!entry) return null;
+
+      // Add to session cache so we don't query DB again
+      this.sessionCache.set(key, Promise.resolve(entry.response));
 
 
       prisma.lLMCache.update({
@@ -100,6 +107,8 @@ export class LLMCacheManager {
         },
       });
 
+      this.sessionCache.set(data.key, Promise.resolve(data.response));
+
       this.cleanupOldCache().catch(() => {});
     } catch (err) {
       console.warn("Failed to write to LLM Cache:", err);
@@ -110,6 +119,7 @@ export class LLMCacheManager {
    * Clears all entries from the cache.
    */
   public static async clearCache(): Promise<void> {
+    this.sessionCache.clear();
     await prisma.lLMCache.deleteMany();
   }
 

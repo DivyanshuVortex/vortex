@@ -38,8 +38,8 @@ export class IntelligenceAgent {
 
   private getCurrentCommitHash(): string {
     try {
-      const hash = execSync("git rev-parse HEAD").toString().trim();
-      const isDirty = execSync("git status --porcelain").toString().trim().length > 0;
+      const hash = execSync("git rev-parse HEAD", { stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim();
+      const isDirty = execSync("git status --porcelain", { stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim().length > 0;
       return isDirty ? `${hash}-dirty` : hash;
     } catch {
       return "unknown";
@@ -70,6 +70,31 @@ export class IntelligenceAgent {
     } catch (err) {
       console.warn("Failed to extract queries from diff:", err);
       return [];
+    }
+  }
+
+  /**
+   * Expands a single query into 3-5 variants for better retrieval recall.
+   */
+  async expandQuery(query: string): Promise<string[]> {
+    const prompt = `You are a search query expansion assistant. 
+Given the user query, generate 3-5 distinct, highly relevant search queries that capture different keywords or ways to express the intent.
+Return ONLY a valid JSON array of strings.
+Query: "${query}"`;
+
+    try {
+      let result = await this.callLLM(prompt, { bypassCache: false });
+      if (result.startsWith("\`\`\`")) {
+        result = result.replace(/^\`\`\`[a-z]*\n/, "").replace(/\n\`\`\`$/, "");
+      }
+      const queries = JSON.parse(result);
+      if (Array.isArray(queries)) {
+        return Array.from(new Set([query, ...queries])).slice(0, 5);
+      }
+      return [query];
+    } catch (err) {
+      console.warn("Failed to expand query:", err);
+      return [query];
     }
   }
 

@@ -267,20 +267,47 @@ export abstract class BaseAgent {
     const cleanResponse = response.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/<state_update>[\s\S]*?<\/state_update>/ig, '').trim();
     const calls: { name: string; args: Record<string, string>; isXml?: boolean; prefix?: string }[] = [];
 
-    const xmlRegex = /<([a-zA-Z0-9_]+_)?tool_call>\s*([a-zA-Z0-9_]+)[\s\S]*?<\/\1tool_call>/g;
+    const xmlRegex = /<([a-zA-Z0-9_]+_)?tool_call>([\s\S]*?)<\/\1tool_call>/g;
     let xmlMatch;
     while ((xmlMatch = xmlRegex.exec(cleanResponse)) !== null) {
       const prefix = xmlMatch[1] || "";
-      const name = (xmlMatch[2] || "").trim();
+      const blockContent = xmlMatch[2] || "";
+      
+      let name = "";
+      const nameMatch = blockContent.match(/^\s*([a-zA-Z0-9_]+)/);
+      const tagMatch = blockContent.match(/<([a-zA-Z0-9_]*_)?(tool_)?name>\s*([a-zA-Z0-9_]+)\s*<\/\1\2name>/);
+      
+      if (tagMatch && tagMatch[3]) {
+         name = tagMatch[3].trim();
+      } else if (nameMatch && nameMatch[1]) {
+         name = nameMatch[1].trim();
+      }
+
       const args: Record<string, string> = {};
       const argRegex = new RegExp(`<(${prefix})?arg_key>\\s*([^<]+)\\s*<\\/\\1?arg_key>\\s*<(${prefix})?arg_value>\\s*([\\s\\S]*?)\\s*<\\/\\3?arg_value>`, "g");
       let match;
-      while ((match = argRegex.exec(xmlMatch[0])) !== null) {
+      while ((match = argRegex.exec(blockContent)) !== null) {
         if (match[2] && match[4]) {
           args[match[2].trim()] = match[4].trim();
         }
       }
-      calls.push({ name, args, isXml: true, prefix });
+
+      if (Object.keys(args).length === 0 || (name === 'write_file' && (!args.path || !args.content)) || (name === 'replace_in_file' && (!args.path || (!args.target && !args.replacement)))) {
+        const directTagRegex = /<([a-zA-Z0-9_]+)>\s*([\s\S]*?)\s*<\/\1>/g;
+        let directMatch;
+        while ((directMatch = directTagRegex.exec(blockContent)) !== null) {
+          if (directMatch[1] && directMatch[2]) {
+            const key = directMatch[1].trim();
+            if (key !== 'tool_call' && key !== 'tool_name' && key !== 'name' && key !== 'arg_key' && key !== 'arg_value') {
+              args[key] = directMatch[2].trim();
+            }
+          }
+        }
+      }
+
+      if (name) {
+        calls.push({ name, args, isXml: true, prefix });
+      }
     }
 
     if (calls.length > 0) return calls;

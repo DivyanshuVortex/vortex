@@ -1,5 +1,5 @@
-import { listTrackedFiles, isGitRepo, getGitRoot } from "@vortex/git";
-import { chunkFile, LocalEmbedder, VectorStore, BM25Index, HybridRetriever } from "@vortex/retrieval";
+import { isGitRepo, getGitRoot, listTrackedFiles } from "@vortex/git";
+import { chunkFile, LocalEmbedder, VectorStore, BM25Index, scanFiles, HybridRetriever } from "@vortex/retrieval";
 import { createQueryChunk } from "@vortex/shared";
 import * as path from "path";
 import * as fs from "fs";
@@ -21,29 +21,40 @@ export class Indexer {
    * Builds both the vector store (for semantic search) and the BM25 index (for keyword search).
    */
   async indexRepository(cwd: string): Promise<{ filesProcessed: number; chunksIndexed: number; bm25Documents: number }> {
-    if (!isGitRepo(cwd)) {
-      throw new Error(`Directory ${cwd} is not a git repository.`);
+    let root = cwd;
+    if (isGitRepo(cwd)) {
+      try {
+        root = getGitRoot(cwd);
+      } catch {}
     }
-
-    const root = getGitRoot(cwd);
-    // Suppressed log for TUI
-    // console.log(`Starting indexing for repository at ${root}`);
-
 
     await initDatabase();
 
-    const files = listTrackedFiles(root).filter(file => {
-      const ext = path.extname(file);
-      const supportedExts = [
-        '.ts', '.tsx', '.js', '.jsx',
-        '.py', '.go', '.rs', '.java',
-        '.cpp', '.hpp', '.c', '.h',
-        '.rb', '.php', '.html', '.css'
-      ];
-      return supportedExts.includes(ext) && !file.includes('node_modules');
-    });
-    // Suppressed log for TUI
-    // console.log(`Found ${files.length} supported source files.`);
+    let files: string[] = [];
+    
+    if (isGitRepo(cwd)) {
+      try {
+        const tracked = listTrackedFiles(root).filter(file => {
+          const ext = path.extname(file);
+          const supportedExts = [
+            '.ts', '.tsx', '.js', '.jsx',
+            '.py', '.go', '.rs', '.java',
+            '.cpp', '.hpp', '.c', '.h',
+            '.rb', '.php', '.html', '.css'
+          ];
+          return supportedExts.includes(ext) && !file.includes('node_modules');
+        });
+        if (tracked.length > 0) {
+          files = tracked;
+        }
+      } catch (e) {}
+    }
+
+    if (files.length === 0) {
+      for await (const file of scanFiles(root)) {
+        files.push(file);
+      }
+    }
 
     let totalChunks = 0;
 

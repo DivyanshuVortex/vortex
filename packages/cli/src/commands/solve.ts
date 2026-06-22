@@ -22,7 +22,7 @@ import { initDatabase } from "@vortex/db";
 import { getGitRoot, isGitRepo } from "@vortex/git";
 import { VectorStore, LocalEmbedder, BM25Index, HybridRetriever } from "@vortex/retrieval";
 
-export async function solveCommand(prompt: string, options: { autoApprove?: boolean; maxSteps?: number; contextChunks?: AgentContextChunk[]; newProject?: string } = {}) {
+export async function solveCommand(prompt: string, options: { autoApprove?: boolean; maxSteps?: number; contextChunks?: AgentContextChunk[]; newProject?: string; verify?: string | boolean } = {}) {
   let cwd = process.cwd();
 
   if (options.newProject) {
@@ -70,7 +70,7 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
     if (!options.contextChunks || options.contextChunks.length === 0) {
       try {
         const indexer = new Indexer();
-        const relevantContext = await indexer.hybridSearch(prompt, 5);
+        const relevantContext = await indexer.hybridSearch(prompt, 15);
         options.contextChunks = relevantContext.map((c: any) => ({
           file: c.file,
           symbolPath: c.symbolPath || "anonymous",
@@ -95,7 +95,10 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
       const parsedPlan = JSON.parse(executionPlanStr);
       planSummary = parsedPlan.summary || planSummary;
       stepCount = parsedPlan.steps ? parsedPlan.steps.length : 0;
-      executionPlan = parsedPlan.steps ? parsedPlan.steps.map((s: string, i: number) => `${i + 1}. ${s}`).join("\n") : executionPlanStr;
+      executionPlan = parsedPlan.steps ? parsedPlan.steps.map((s: any, i: number) => {
+        if (typeof s === 'string') return `${i + 1}. ${s}`;
+        return `${i + 1}. [${(s.action || 'MODIFY').toUpperCase()}] ${s.file || 'General'}\n   ${s.description}`;
+      }).join("\n\n") : executionPlanStr;
       filesToRead = parsedPlan.filesToRead || [];
     } catch {
       executionPlan = executionPlanStr;
@@ -188,6 +191,7 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
       },
       {
         initialState,
+        verifyCommand: options.verify,
         onToolCall: (toolName, args) => {
           if (toolName === "write_file") {
             spinner.text = `Writing ${args.path}...`;

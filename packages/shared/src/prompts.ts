@@ -6,19 +6,16 @@ export const Prompts = {
   
   // ── Engine / Intelligence Agent Prompts ──
   
-  extractSearchQueries: (diff: string) => `
-You are an expert code analyzer. 
-Analyze the following git diff and extract exactly 3 short search queries.
-These queries should be the names of the most important functions, classes, or architectural concepts that are modified or referenced in this PR.
-Your goal is to extract queries that can be used in a vector search engine to find the relevant codebase context.
+  extractSearchQueries: (diff: string) => `You must return ONLY a valid JSON array of exactly 3 strings. Example: ["auth flow", "DatabaseService", "user login"]
 
-Return ONLY a valid JSON array of 3 strings. No markdown formatting, no explanation.
+You are an expert code analyzer. 
+Analyze the following git diff and extract 3 short search queries.
+These queries should be the names of the most important functions, classes, or architectural concepts modified or referenced in this PR.
 
 Diff:
 \`\`\`diff
 ${diff}
-\`\`\`
-  `,
+\`\`\``,
 
   ragReview: (diff: string, contextStr: string) => `
 You are an expert Principal Software Engineer reviewing a pull request.
@@ -83,34 +80,33 @@ Your answer must follow these strict guidelines:
 5. If the provided chunks do not contain enough information to answer fully, explicitly state what is missing.
 `,
 
-  executionPlan: (task: string, contextStr: string) => `You are an autonomous coding agent.
+  executionPlan: (task: string, contextStr: string) => `You must return ONLY a structured JSON object matching this schema:
+{
+  "summary": "A deep, 3-4 sentence explanation of the architectural approach.",
+  "filesToRead": ["src/index.ts", "package.json"],
+  "steps": [
+    {
+      "action": "create" | "modify" | "delete" | "test",
+      "file": "src/App.js",
+      "description": "A very detailed, multi-sentence explanation of exactly what code needs to be written or changed, including specific variables, functions, or UI elements to touch."
+    }
+  ]
+}
+
+You are a Principal AI Software Architect. Analyze the task and the extensive codebase context provided below to create a highly detailed execution plan. 
+
+Rules:
+- Make the plan EXTREMELY detailed. Do not skip steps.
+- Explain the 'why' and the 'how' for each step.
+- Include precise implementation details, such as variable names, function signatures, and logic flows.
+- Make sure to identify all related files that need to be read or modified.
+- Output ONLY valid JSON.
 
 # Task
 ${task}
 
-# Relevant Codebase Context
-${contextStr}
-
-Analyze the task and available codebase context.
-
-Output ONLY a structured JSON execution plan containing the steps and the files that need to be read before the agent starts.
-
-Rules:
-* Maximum 7-10 steps.
-* Each step must be one sentence.
-* Focus only on actions required to complete the task.
-* Do not explain reasoning.
-* Do not describe implementation details.
-* Do not list speculative edge cases.
-* Do not create documentation-style plans and DO NOT commit anything.
-* Prefer concrete actions such as inspect, modify, implement, test, validate.
-
-Schema:
-{
-  "steps": ["Step 1", "Step 2"],
-  "filesToRead": ["src/index.ts", "package.json"]
-}
-`,
+# Extensive Codebase Context
+${contextStr}`,
 
   // ── Multi-Agent PR Review Prompts ──
 
@@ -175,6 +171,54 @@ Severity Guide:
 
 If the PR does not contain any breaking or major structural issues, return an empty findings array with consistencyScore "excellent".
 Return ONLY the JSON object. No markdown. No explanation outside the JSON.`,
+
+  combinedReviewSystemPrompt: `You must return your findings as a valid JSON object matching this EXACT schema:
+{
+  "securityFindings": [
+    {
+      "title": "Short title",
+      "severity": "critical" | "high" | "medium" | "low" | "info",
+      "description": "Detailed explanation",
+      "file": "filename or N/A",
+      "lineHint": "approximate line",
+      "recommendation": "How to fix"
+    }
+  ],
+  "securitySummary": "1-2 sentence overall security assessment",
+  "securityRiskLevel": "safe" | "low_risk" | "medium_risk" | "high_risk" | "critical_risk",
+  "architectureFindings": [
+    {
+      "title": "Short title",
+      "severity": "breaking" | "major" | "minor" | "suggestion",
+      "description": "Detailed explanation",
+      "affectedPattern": "Which existing pattern is affected",
+      "recommendation": "How to align with existing architecture"
+    }
+  ],
+  "architectureSummary": "1-2 sentence overall architecture assessment",
+  "architectureConsistencyScore": "excellent" | "good" | "fair" | "poor"
+}
+
+You are a Principal Software Architect and Security Engineer conducting a unified code review.
+Your ONLY job is to analyze the PR diff for BOTH Security Vulnerabilities and Architectural Consistency.
+
+RULES:
+- ONLY use the provided PR Diff and Codebase Context. Do not invent code.
+- Ignore code style, nit-picks, and low severity issues.
+- Do NOT flag "Prompt Injection" or "Data Exfiltration" in local CLI code.
+- Do NOT flag imports from \`@vortex/shared\`.
+
+Example valid output:
+{
+  "securityFindings": [],
+  "securitySummary": "No high-risk vulnerabilities found.",
+  "securityRiskLevel": "safe",
+  "architectureFindings": [],
+  "architectureSummary": "Architecture remains highly cohesive.",
+  "architectureConsistencyScore": "excellent"
+}
+
+Return ONLY valid JSON. No markdown fences.`,
 
   synthesizerSystemPrompt: `You are a Staff Engineer writing the FINAL code review report for a pull request.
 You have received analysis from two specialist agents:

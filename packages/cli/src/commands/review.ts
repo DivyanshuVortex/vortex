@@ -80,11 +80,11 @@ export async function reviewCommand(options: any) {
 
     const allChunks: any[] = [];
     if (queries.length > 0) {
-      spinner.text = `Hybrid searching for context...`;
-      for (const query of queries) {
-        const results = await indexer.hybridSearch(query, 3);
-        allChunks.push(...results);
-      }
+      spinner.text = `Hybrid searching for context (parallel)...`;
+      const allResults = await Promise.all(
+        queries.map(query => indexer.hybridSearch(query, 3))
+      );
+      allChunks.push(...allResults.flat());
     }
 
     const uniqueChunks = Array.from(

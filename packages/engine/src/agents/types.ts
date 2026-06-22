@@ -117,6 +117,21 @@ export const ArchitectureOutputSchema = z.object({
 export type ArchitectureOutput = z.infer<typeof ArchitectureOutputSchema>;
 
 // ─────────────────────────────────────────────
+// Combined Review Agent Types (Batched)
+// ─────────────────────────────────────────────
+
+export const CombinedReviewOutputSchema = z.object({
+  securityFindings: z.array(SecurityFindingSchema),
+  securitySummary: z.string().describe("1-2 sentence overall security assessment"),
+  securityRiskLevel: z.enum(["safe", "low_risk", "medium_risk", "high_risk", "critical_risk"]),
+  architectureFindings: z.array(ArchitectureFindingSchema),
+  architectureSummary: z.string().describe("1-2 sentence overall architecture assessment"),
+  architectureConsistencyScore: z.enum(["excellent", "good", "fair", "poor"]),
+});
+
+export type CombinedReviewOutput = z.infer<typeof CombinedReviewOutputSchema>;
+
+// ─────────────────────────────────────────────
 // Synthesizer Agent Types
 // ─────────────────────────────────────────────
 

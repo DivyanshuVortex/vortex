@@ -15,21 +15,26 @@ export interface GenerateOptions {
 }
 
 const DEFAULT_MODEL_PRIORITY = [
+  // Gemini
+  "gemini-2.5-flash",
+  "gemini-3.1-flash-lite",
+  "gemini-2.5-flash-lite",
+
+  // Groq
+  "llama-3.3-70b-versatile",
+  "llama-3.1-8b-instant",
+  "allam-2-7b",
+
+  // OpenRouter
   "nvidia/nemotron-3-ultra-550b-a55b:free",
   "nex-agi/nex-n2-pro:free",
   "openrouter/owl-alpha",
   "nvidia/nemotron-3-super-120b-a12b:free",
   "openai/gpt-oss-20b:free",
   "openai/gpt-oss-120b:free",
-  "gemini-2.5-flash",
   "openai/gpt-oss-120b",
-  "llama-3.3-70b-versatile",
   "qwen/qwen3.6-27b",
   "qwen/qwen3-32b",
-  "gemini-3.1-flash-lite",
-  "gemini-2.5-flash-lite",
-  "llama-3.1-8b-instant",
-  "allam-2-7b"
 ];
 
 const getApiKeys = (prefix: string): string[] => {

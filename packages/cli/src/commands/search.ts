@@ -15,21 +15,33 @@ export async function searchCommand(options: any) {
   const indexer = new Indexer();
 
   try {
-    spinner.text = "Running hybrid search (vector + BM25 + cross-encoder)...";
-    const results = await indexer.hybridSearch(options.query, parseInt(options.limit, 10));
+    spinner.text = options.expandQuery ? "Expanding query and running parallel hybrid search..." : "Running hybrid search (vector + BM25 + cross-encoder)...";
     
-    if (results.length === 0) {
+    let queriesToSearch = [options.query];
+    const agent = new IntelligenceAgent();
+
+    if (options.expandQuery) {
+      queriesToSearch = await agent.expandQuery(options.query);
+    }
+
+    const allResults = await Promise.all(
+      queriesToSearch.map(q => indexer.hybridSearch(q, parseInt(options.limit, 10)))
+    );
+    
+    const flatResults = allResults.flat();
+    const uniqueResults = Array.from(new Map(flatResults.map((c) => [c.id, c])).values()).sort((a, b) => b.score - a.score).slice(0, parseInt(options.limit, 10));
+
+    if (uniqueResults.length === 0) {
       spinner.fail("No relevant code found.");
       return;
     }
     
-    spinner.text = `Found ${results.length} relevant code chunks. Analyzing with AI engine...`;
+    spinner.text = `Found ${uniqueResults.length} relevant code chunks. Analyzing with AI engine...`;
     
     const memoryService = new MemoryService();
     const memories = await memoryService.recallRelevantMemories(options.query, 3);
     
-    const agent = new IntelligenceAgent();
-    const answer = await agent.answerQueryWithContext(options.query, results);
+    const answer = await agent.answerQueryWithContext(options.query, uniqueResults);
     
     spinner.succeed("Analysis complete!\n");
     
@@ -47,7 +59,7 @@ export async function searchCommand(options: any) {
     console.log(formatted);
     
     console.log(chalk.cyan.dim(" Reference Material (Hybrid Retrieval)"));
-    results.forEach((res: any, i: number) => {
+    uniqueResults.forEach((res: any, i: number) => {
       const sources = res.sources ? res.sources.join("+") : "vector";
       const scoreStr = res.score ? (res.score * 100).toFixed(1) + '%' : 'N/A';
       console.log(chalk.gray(`  │ [${i + 1}] ${res.file.replace(process.cwd(), '')} ➔ ${res.symbolPath || '(anonymous)'} (${scoreStr}) [${sources}]`));

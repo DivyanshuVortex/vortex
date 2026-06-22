@@ -247,23 +247,21 @@ export function chunkFile(
       parent,
     } = params;
 
-    const actualContentNode =
-      contentNode ?? node;
+    const actualContentNode = contentNode ?? node;
 
-    const content =
-      actualContentNode.getText(
-        sourceFile,
-      );
+    let content = actualContentNode.getText(sourceFile);
+    const startLine = getLine(actualContentNode.getStart(sourceFile));
+    const endLine = getLine(actualContentNode.getEnd());
 
-    const startLine = getLine(
-      actualContentNode.getStart(
-        sourceFile,
-      ),
-    );
-
-    const endLine = getLine(
-      actualContentNode.getEnd(),
-    );
+    // Add overlap: prepend up to 30 lines of preceding context
+    if (startLine > 1) {
+      const allLines = source.split('\n');
+      const startIdx = Math.max(0, startLine - 1 - 30);
+      const prepended = allLines.slice(startIdx, startLine - 1).join('\n');
+      if (prepended.trim().length > 0) {
+        content = `// Context Overlap:\n${prepended}\n// End Overlap\n${content}`;
+      }
+    }
 
     const kind =
       getChunkKind(node);

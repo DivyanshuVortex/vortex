@@ -12,9 +12,9 @@ cacheCommand
       const stats = await LLMCacheManager.getStats();
       console.log("\nLLM Cache Statistics\n");
       console.log(`Entries:    ${stats.entries.toLocaleString()}`);
-      console.log(`Hits:       ${stats.hits.toLocaleString()}`);
+      console.log(`Saved API Calls: ${stats.hits.toLocaleString()}`);
       const storageMB = (stats.storage / 1024 / 1024).toFixed(2);
-      console.log(`Storage:    ${storageMB} MB\n`);
+      console.log(`Storage Used:    ${storageMB} MB\n`);
     } catch (err) {
       console.error("Failed to retrieve cache stats:", err);
     }

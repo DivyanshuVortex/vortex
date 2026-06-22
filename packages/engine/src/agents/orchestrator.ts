@@ -1,5 +1,3 @@
-import { SecurityAgent } from "./security-agent";
-import { ArchitectureAgent } from "./architecture-agent";
 import { SynthesizerAgent } from "./synthesizer-agent";
 import {
   AgentInput,
@@ -8,44 +6,32 @@ import {
   SecurityOutput,
   ArchitectureOutput,
   SynthesisOutput,
+  CombinedReviewOutputSchema,
+  CombinedReviewOutput,
 } from "./types";
 import { AgentTool } from "../tools/tool-types";
+import { generateStructured } from "../llm-structured";
+import { GoogleGenAI } from "@google/genai";
+import { Prompts } from "@vortex/shared";
 
 /**
  * ReviewOrchestrator — Multi-Agent Review Pipeline
  *
  * Coordinates specialized agents to produce a comprehensive PR review:
  *
- * ┌──────────────────────────────────────────────┐
- * │            ReviewOrchestrator                 │
- * │                                               │
- * │   ┌───────────────┐  ┌────────────────────┐  │
- * │   │ SecurityAgent │  │ ArchitectureAgent   │  │
- * │   │ (parallel)    │  │ (parallel)          │  │
- * │   └──────┬────────┘  └──────────┬─────────┘  │
- * │          │                      │             │
- * │          └──────────┬───────────┘             │
- * │                     │                         │
- * │          ┌──────────▼──────────┐              │
- * │          │ SynthesizerAgent    │              │
- * │          │ (sequential)        │              │
- * │          └──────────┬──────────┘              │
- * │                     │                         │
- * │              OrchestratedReview               │
- * └──────────────────────────────────────────────┘
- *
- * - Security + Architecture agents run in PARALLEL for speed
- * - Synthesizer runs AFTER both complete, receiving their outputs
- * - Memory injection happens before all agents run
+ * 1. Batched Security + Architecture Analysis (1 LLM call using Structured Output)
+ * 2. Synthesis (1 LLM call)
  */
 export class ReviewOrchestrator {
-  private securityAgent: SecurityAgent;
-  private architectureAgent: ArchitectureAgent;
   private synthesizerAgent: SynthesizerAgent;
+  private client: GoogleGenAI;
 
   constructor(apiKey?: string) {
-    this.securityAgent = new SecurityAgent(apiKey);
-    this.architectureAgent = new ArchitectureAgent(apiKey);
+    const key = apiKey || process.env.GEMINI_API_KEY;
+    if (!key) {
+      throw new Error("GEMINI_API_KEY is not set.");
+    }
+    this.client = new GoogleGenAI({ apiKey: key });
     this.synthesizerAgent = new SynthesizerAgent(apiKey);
   }
 
@@ -53,19 +39,13 @@ export class ReviewOrchestrator {
    * Register tools across all agents that support self-verification.
    */
   public registerTools(tools: AgentTool[]): void {
-
-    this.securityAgent.registerTools(tools);
-    this.architectureAgent.registerTools(tools);
-
+    // Currently, ReviewOrchestrator doesn't use tools for the batched call, 
+    // but we can pass them to synthesizer if needed in the future.
+    this.synthesizerAgent.registerTools(tools);
   }
 
   /**
    * Runs the full multi-agent review pipeline.
-   *
-   * @param diff - The raw PR diff text
-   * @param contextChunks - Relevant codebase chunks from hybrid retrieval
-   * @param memories - Optional relevant memories from past reviews
-   * @returns Comprehensive OrchestratedReview with all agent outputs
    */
   public async runReview(
     diff: string,
@@ -74,34 +54,48 @@ export class ReviewOrchestrator {
   ): Promise<OrchestratedReview> {
     const startTime = Date.now();
 
-    const baseInput: AgentInput = {
-      diff,
-      contextChunks,
-      memories,
-    };
+    if (process.env.DEBUG) console.log("\nRunning Batched Security + Architecture Review...");
 
-    if (process.env.DEBUG) console.log("\nRunning Security and Architecture agents in parallel...");
+    let combinedPrompt = `## PR Diff to Review\n\`\`\`diff\n${diff}\n\`\`\`\n`;
 
-    const [securityResult, architectureResult] = await Promise.all([
-      this.runAgentSafe("SecurityAgent", () =>
-        this.securityAgent.run(baseInput)
-      ),
-      this.runAgentSafe("ArchitectureAgent", () =>
-        this.architectureAgent.run(baseInput)
-      ),
-    ]);
+    if (contextChunks.length > 0) {
+      combinedPrompt += `\n## Existing Codebase Context\nUse this to understand what patterns the codebase already uses:\n`;
+      contextChunks.forEach((chunk, i) => {
+        combinedPrompt += `\n### Context ${i + 1}: ${chunk.file} → ${chunk.symbolPath}\n\`\`\`${chunk.kind}\n${chunk.content}\n\`\`\`\n`;
+      });
+    }
+
+    if (memories && memories.length > 0) {
+      combinedPrompt += `\n## Historical Context\nThese are relevant findings from past reviews:\n`;
+      memories.forEach((mem, i) => {
+        combinedPrompt += `- Memory ${i + 1}: ${mem}\n`;
+      });
+    }
+
+    combinedPrompt = Prompts.combinedReviewSystemPrompt + "\n\n" + combinedPrompt;
+
+    let combinedResult: CombinedReviewOutput | null = null;
+    try {
+      combinedResult = await generateStructured<CombinedReviewOutput>(
+        this.client,
+        combinedPrompt,
+        CombinedReviewOutputSchema,
+        { label: "ReviewOrchestrator (Batched)", maxValidationRetries: 3 }
+      );
+    } catch (err) {
+      console.error("\nBatched Review failed:", err);
+    }
 
     const securityOutput: SecurityOutput = {
-      findings: securityResult.findings ?? [],
-      summary: securityResult.summary,
-      riskLevel: (securityResult as any).riskLevel ?? "low_risk",
+      findings: combinedResult?.securityFindings ?? [],
+      summary: combinedResult?.securitySummary ?? "Security analysis encountered an error.",
+      riskLevel: combinedResult?.securityRiskLevel ?? "low_risk",
     };
 
     const architectureOutput: ArchitectureOutput = {
-      findings: architectureResult.findings ?? [],
-      summary: architectureResult.summary,
-      consistencyScore:
-        (architectureResult as any).consistencyScore ?? "good",
+      findings: combinedResult?.architectureFindings ?? [],
+      summary: combinedResult?.architectureSummary ?? "Architecture analysis encountered an error.",
+      consistencyScore: combinedResult?.architectureConsistencyScore ?? "good",
     };
 
     if (process.env.DEBUG) {
@@ -174,3 +168,4 @@ export class ReviewOrchestrator {
     }
   }
 }
+
