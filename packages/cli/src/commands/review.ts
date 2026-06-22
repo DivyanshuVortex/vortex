@@ -19,11 +19,8 @@ export async function reviewCommand(options: any) {
     renderer: new TerminalRenderer() as any,
   });
 
-  if (options.pr) {
-    console.log(chalk.blue.bold(`\nMulti-Agent Review for PR #${options.pr}\n`));
-  } else {
-    console.log(chalk.blue.bold(`\nMulti-Agent Review for Local Changes\n`));
-  }
+  const reviewTitle = options.pr ? `PR #${options.pr}` : 'local';
+  console.log(`\n  ${chalk.cyan('◆')} Vortex  ·  review  ·  ${reviewTitle}\n`);
 
   if (!process.env.GITHUB_TOKEN) {
     console.log(
@@ -68,8 +65,10 @@ export async function reviewCommand(options: any) {
       }
     }
 
+    const diffLines = diff.split('\n').filter(l => l.startsWith('+++') || l.startsWith('---')).length / 2 || 1;
+    spinner.succeed(`Fetched diff  ·  ~${Math.floor(diffLines)} files changed`);
 
-    spinner.text = "Extracting architectural queries from diff...";
+    spinner.start("Extracting architectural queries from diff...");
     const agent = new IntelligenceAgent();
     const indexer = new Indexer();
 
@@ -77,18 +76,16 @@ export async function reviewCommand(options: any) {
 
     const allChunks: any[] = [];
     if (queries.length > 0) {
-      spinner.text = `Hybrid searching for: ${queries.join(", ")}...`;
+      spinner.text = `Hybrid searching for context...`;
       for (const query of queries) {
         const results = await indexer.hybridSearch(query, 3);
         allChunks.push(...results);
       }
     }
 
-
     const uniqueChunks = Array.from(
       new Map(allChunks.map((c) => [c.id, c])).values()
     );
-
 
     spinner.text = "Checking memory for relevant past reviews...";
     const memoryService = new MemoryService();
@@ -97,19 +94,17 @@ export async function reviewCommand(options: any) {
       3
     );
 
-
-    spinner.text = `Running multi-agent review (Security + Architecture + Synthesis)...`;
+    spinner.text = `Running multi-agent review (Security, Architecture, Synthesis)...`;
     const review = await agent.generateMultiAgentReview(
       diff,
       uniqueChunks,
       memories
     );
 
-    spinner.succeed(
-      chalk.green(
-        `Review complete in ${(review.durationMs / 1000).toFixed(1)}s!\n`
-      )
-    );
+    spinner.stop();
+    console.log(`  ${chalk.green('✔')} Security Agent       ${review.agentOutputs.security.findings.length} findings`);
+    console.log(`  ${chalk.green('✔')} Architecture Agent   ${review.agentOutputs.architecture.findings.length} suggestions`);
+    console.log(`  ${chalk.green('✔')} Synthesizer          Report ready\n`);
 
 
     const parsedReview = await marked.parse(review.markdownReport);
@@ -150,37 +145,23 @@ export async function reviewCommand(options: any) {
     );
 
 
-    const { security, architecture } = review.agentOutputs;
+    const { security, architecture, synthesis } = review.agentOutputs;
 
-    console.log(
-      chalk.dim(
-        `\n Security: ${security.riskLevel} (${security.findings.length} findings)`
-      )
-    );
-    security.findings.forEach((f: any, i: number) => {
-      const severityColor =
-        f.severity === "critical" || f.severity === "high"
-          ? chalk.red
-          : f.severity === "medium"
-            ? chalk.yellow
-            : chalk.gray;
-      console.log(severityColor(`    [${f.severity.toUpperCase()}] ${f.title}`));
-    });
-
-    console.log(
-      chalk.dim(
-        `\n Architecture: ${architecture.consistencyScore} (${architecture.findings.length} findings)`
-      )
-    );
-    architecture.findings.forEach((f: any, i: number) => {
-      const severityColor =
-        f.severity === "breaking"
-          ? chalk.red
-          : f.severity === "major"
-            ? chalk.yellow
-            : chalk.gray;
-      console.log(severityColor(`    [${f.severity.toUpperCase()}] ${f.title}`));
-    });
+    const secCount = security.findings.length;
+    const archCount = architecture.findings.length;
+    
+    // Draw the summary bar chart
+    console.log(`  ────────────────────────────────────────`);
+    
+    const secBar = secCount > 0 ? chalk.red('█'.repeat(Math.min(secCount, 10))) : chalk.green('░');
+    console.log(`  SECURITY    ${secBar.padEnd(20)}  ${secCount} issues`);
+    
+    const archBar = archCount > 0 ? chalk.yellow('█'.repeat(Math.min(archCount, 10))) : chalk.green('░');
+    console.log(`  ARCH        ${archBar.padEnd(20)}  ${archCount} suggestions`);
+    
+    const logicBar = synthesis.verdict === 'SAFE_TO_MERGE' ? chalk.green('░') : chalk.red('█');
+    console.log(`  LOGIC       ${logicBar.padEnd(20)}  ${synthesis.verdict.toLowerCase().replace(/_/g, ' ')}`);
+    console.log(`  ────────────────────────────────────────\n`);
 
     if (uniqueChunks.length > 0) {
       console.log(chalk.cyan.dim("\n Cross-Referenced Architecture:"));

@@ -80,7 +80,7 @@ export class ReviewOrchestrator {
       memories,
     };
 
-    console.log("\nRunning Security and Architecture agents in parallel...");
+    if (process.env.DEBUG) console.log("\nRunning Security and Architecture agents in parallel...");
 
     const [securityResult, architectureResult] = await Promise.all([
       this.runAgentSafe("SecurityAgent", () =>
@@ -104,14 +104,11 @@ export class ReviewOrchestrator {
         (architectureResult as any).consistencyScore ?? "good",
     };
 
-    console.log(
-      `  Security: ${securityOutput.riskLevel} (${securityOutput.findings.length} findings)`
-    );
-    console.log(
-      `  Architecture: ${architectureOutput.consistencyScore} (${architectureOutput.findings.length} findings)`
-    );
-
-    console.log("\nSynthesizing final review...");
+    if (process.env.DEBUG) {
+      console.log(`  Security: ${securityOutput.riskLevel} (${securityOutput.findings.length} findings)`);
+      console.log(`  Architecture: ${architectureOutput.consistencyScore} (${architectureOutput.findings.length} findings)`);
+      console.log("\nSynthesizing final review...");
+    }
 
     const synthesisInput: AgentInput = {
       diff,
@@ -140,9 +137,9 @@ export class ReviewOrchestrator {
 
     const durationMs = Date.now() - startTime;
 
-    console.log(
-      `\nReview complete in ${(durationMs / 1000).toFixed(1)}s | Verdict: ${synthesisOutput.verdict}`
-    );
+    if (process.env.DEBUG) {
+      console.log(`\nReview complete in ${(durationMs / 1000).toFixed(1)}s | Verdict: ${synthesisOutput.verdict}`);
+    }
 
     return {
       verdict: synthesisOutput.verdict,

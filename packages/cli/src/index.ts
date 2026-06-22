@@ -4,8 +4,6 @@ import { Command } from "commander";
 import * as path from "path";
 import * as dotenv from "dotenv";
 import * as os from "os";
-
-// Suppress dotenv logging
 process.env.DOTENV_CONFIG_QUIET = "true";
 
 
@@ -36,13 +34,10 @@ import { searchCommand } from "./commands/search";
 import { reviewCommand } from "./commands/review";
 import { issueCommand } from "./commands/issue";
 import { graphCommand } from "./commands/graph";
-import { suggestCommand } from "./commands/suggest";
-import { fixNitbitsCommand } from "./commands/fix-nitbits";
-import { analyzeCommand } from "./commands/analyze";
+
 import { solveCommand } from "./commands/solve";
 import { solveIssueCommand } from "./commands/solve-issue";
 import { cacheCommand } from "./commands/cache";
-import { configSet, configGet, configList } from "./commands/config";
 
 const program = new Command();
 
@@ -53,9 +48,31 @@ program
   .description("Developer Intelligence & PR Review Engine")
   .version(version);
 
-program.hook("preAction", (thisCommand, actionCommand) => {
+program.hook("preAction", async (thisCommand, actionCommand) => {
   if (actionCommand.opts().cache === false) {
     process.env.VORTEX_DISABLE_CACHE = "true";
+  }
+
+  const cmdName = actionCommand.name();
+  if (['solve', 'solve-issue', 'review', 'suggest', 'analyze', 'search'].includes(cmdName)) {
+    const { default: ora } = await import("ora");
+    const { default: chalk } = await import("chalk");
+    
+    console.log(`\n  ${chalk.cyan('◆')} Vortex\n`);
+    const spinner = ora("Looking for model...").start();
+    
+    if (process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY || process.env.GROQ_API_KEY) {
+       const priorityString = process.env.VORTEX_MODEL_PRIORITY;
+       const models = priorityString 
+         ? priorityString.split(",").map(s => s.trim()).filter(Boolean)
+         : ["nvidia/nemotron-3-ultra-550b-a55b:free", "nex-agi/nex-n2-pro:free", "openrouter/owl-alpha", "gemini-2.5-flash"];
+       const topModel = models[0] || "gemini";
+       spinner.succeed(`Model router active  ·  priority: ${topModel}\n`);
+    } else {
+       spinner.fail(chalk.red("No model configured"));
+       console.log(`\n  Run:  ${chalk.cyan('vortex config set gemini "your_key_here"')}\n`);
+       process.exit(1);
+    }
   }
 });
 
@@ -115,50 +132,6 @@ program
   .action(solveIssueCommand);
 
 // ── AI-Powered Commands ──
-
-program
-  .command("suggest")
-  .description("Generate AI-powered code suggestions using repository patterns and historical intelligence")
-  .requiredOption("--file <path>", "Target file path")
-  .option("--apply", "Apply suggestions automatically")
-  .option("--deep", "Enable advanced contextual suggestions")
-  .option("--no-cache", "Disable LLM response caching")
-  .action(suggestCommand);
-
-program
-  .command("fix-nitbits")
-  .description("Automatically fix formatting, comments, tests, CI issues, and repository-specific patterns")
-  .option("--safe", "Apply only deterministic safe fixes")
-  .option("--dry-run", "Preview fixes without modifying files")
-  .option("--files <paths>", "Comma-separated list of target files")
-  .action(fixNitbitsCommand);
-
-program
-  .command("analyze")
-  .description("Analyze other contributors' PRs using repository history and architectural intelligence")
-  .requiredOption("--pr <number>", "Pull request number", Number)
-  .option("--deep", "Enable advanced PR intelligence analysis")
-  .option("--no-cache", "Disable LLM response caching")
-  .action(analyzeCommand);
-
-const configCmd = program
-  .command("config")
-  .description("Manage global configuration and API keys");
-
-configCmd
-  .command("set <provider> <key>")
-  .description("Set an API key for a specific provider (gemini or groq)")
-  .action(configSet);
-
-configCmd
-  .command("get <key>")
-  .description("Get a global configuration value")
-  .action(configGet);
-
-configCmd
-  .command("list")
-  .description("List all global configuration values")
-  .action(configList);
 
 program.addCommand(cacheCommand);
 

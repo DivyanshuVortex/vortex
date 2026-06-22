@@ -40,6 +40,8 @@ You must return a valid JSON object matching this exact schema:
   "markdownReport": "Full markdown report with headers, bullet points, code blocks, and emojis"
 }
 
+CRITICAL: You are generating a JSON object. You MUST properly escape all newlines inside the \`markdownReport\` string using \\n. DO NOT output literal unescaped newlines inside the JSON string value, as it will break the JSON parser.
+
 Verdict Rules:
 - SAFE_TO_MERGE: No critical/high severity issues from any agent
 - REQUIRES_CHANGES: At least one critical or high severity issue exists
@@ -117,6 +119,17 @@ Return ONLY the JSON object. No markdown wrapping around the JSON itself.`;
           markdownReport: validated.data.markdownReport,
         } as AgentOutput & SynthesisOutput;
       }
+      
+      // If validation failed but we have a parsed JSON object, do our best
+      return {
+        agentName: this.name,
+        findings: [],
+        summary: parsed.summary || "Review complete.",
+        verdict: parsed.verdict || "NEEDS_DISCUSSION",
+        criticalIssues: parsed.criticalIssues || [],
+        suggestions: parsed.suggestions || [],
+        markdownReport: parsed.markdownReport || `## Review Results\n\n\`\`\`json\n${JSON.stringify(parsed, null, 2)}\n\`\`\``,
+      } as AgentOutput & SynthesisOutput;
     }
 
     // Fallback: wrap the raw response in a basic structure

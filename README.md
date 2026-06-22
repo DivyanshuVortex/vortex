@@ -57,7 +57,7 @@ vortex review --pr 42
 - **`vortex search -q <query>`**: Semantic, natural language code search backed by AI explanations.
 - **`vortex issue --id <id>`**: Analyzes GitHub issues and proposes step-by-step local code fixes.
 - **`vortex graph`**: Automatically generates Mermaid dependency graphs of your files or entire project.
-- **`vortex fix-nitbits`**: AI-powered auto-fixer for linting, formatting, and minor structural issues.
+
 
 *Note: Most read-only analysis commands automatically cache LLM requests to speed up subsequent runs and save API costs.*
 

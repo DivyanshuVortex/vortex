@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { Groq } from "groq-sdk";
+import OpenAI from "openai";
 import { LLMCacheManager } from "./cache";
 
 export interface GenerateOptions {
@@ -14,6 +15,12 @@ export interface GenerateOptions {
 }
 
 const DEFAULT_MODEL_PRIORITY = [
+  "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "nex-agi/nex-n2-pro:free",
+  "openrouter/owl-alpha",
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "openai/gpt-oss-20b:free",
+  "openai/gpt-oss-120b:free",
   "gemini-2.5-flash",
   "openai/gpt-oss-120b",
   "llama-3.3-70b-versatile",
@@ -59,7 +66,7 @@ export async function generateWithRetry(
   const useCache = options?.cache?.enabled && process.env.VORTEX_DISABLE_CACHE !== "true";
 
   const priorityString = process.env.VORTEX_MODEL_PRIORITY;
-  const models = priorityString 
+  const models = priorityString
     ? priorityString.split(",").map(s => s.trim()).filter(Boolean)
     : [...DEFAULT_MODEL_PRIORITY];
 
@@ -74,8 +81,9 @@ export async function generateWithRetry(
 
   for (const model of models) {
     const isGemini = model.toLowerCase().startsWith("gemini");
-    const provider = isGemini ? "gemini" : "groq";
-    
+    const isOpenRouter = model.includes("/");
+    const provider = isGemini ? "gemini" : (isOpenRouter ? "openrouter" : "groq");
+
 
     let cacheInfo: ReturnType<typeof LLMCacheManager.generateCacheKey> | null = null;
     if (useCache) {
@@ -115,16 +123,16 @@ export async function generateWithRetry(
             timeoutPromise,
           ]);
           responseText = response.text || "";
-        } else {
-          const groqKeys = getApiKeys('GROQ_API_KEY');
-          const keyToUse = groqKeys.length > 0 ? groqKeys[i % groqKeys.length] : process.env.GROQ_API_KEY;
-          
+        } else if (isOpenRouter) {
+          const openRouterKeys = getApiKeys('OPENROUTER_API_KEY');
+          const keyToUse = openRouterKeys.length > 0 ? openRouterKeys[i % openRouterKeys.length] : process.env.OPENROUTER_API_KEY;
+
           if (!keyToUse) {
-            throw new Error(`GROQ_API_KEY not set for model ${model}`);
+            throw new Error(`OPENROUTER_API_KEY not set for model ${model}`);
           }
-          const groqClient = new Groq({ apiKey: keyToUse });
+          const openRouterClient = new OpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey: keyToUse });
           const response: any = await Promise.race([
-            groqClient.chat.completions.create({
+            openRouterClient.chat.completions.create({
               model: model,
               max_tokens: 4096,
               messages: [{ role: "user", content: prompt }],
@@ -132,6 +140,27 @@ export async function generateWithRetry(
             timeoutPromise,
           ]);
           responseText = response.choices[0]?.message?.content || "";
+        } else {
+          const groqKeys = getApiKeys('GROQ_API_KEY');
+          const keyToUse = groqKeys.length > 0 ? groqKeys[i % groqKeys.length] : process.env.GROQ_API_KEY;
+
+          if (!keyToUse) {
+            throw new Error(`GROQ_API_KEY not set for model ${model}`);
+          }
+          const groqClient = new Groq({ apiKey: keyToUse });
+          const response: any = await Promise.race([
+            groqClient.chat.completions.create({
+              model: model,
+              max_tokens: 6000,
+              messages: [{ role: "user", content: prompt }],
+            }),
+            timeoutPromise,
+          ]);
+          responseText = response.choices[0]?.message?.content || "";
+        }
+
+        if (!responseText.trim()) {
+          throw new Error(`Model ${model} returned an empty string. Context filter or failure suspected.`);
         }
 
         modelSuccess = true;
@@ -140,10 +169,10 @@ export async function generateWithRetry(
         lastError = err;
         if (err.status === 503 || err.status === 429) {
           const delay = Math.pow(2, i) * 2000;
-          console.warn(`\n[${label}] API Busy (${model}). Retrying in ${delay / 1000}s...`);
+          if (process.env.DEBUG) console.warn(`\n[${label}] API Busy (${model}). Retrying in ${delay / 1000}s...`);
           await new Promise((res) => setTimeout(res, delay));
         } else {
-          console.warn(`\n[${label}] Model ${model} failed/unavailable. Shifting to next...`);
+          if (process.env.DEBUG) console.warn(`\n[${label}] Model ${model} failed/unavailable. Shifting to next...`);
           break;
         }
       }
@@ -164,9 +193,9 @@ export async function generateWithRetry(
       }
       return responseText;
     }
-    
+
     if (!modelSuccess && lastError?.status && (lastError.status === 503 || lastError.status === 429)) {
-      console.warn(`\n[${label}] Exhausted retries for ${model}. Shifting to next...`);
+      if (process.env.DEBUG) console.warn(`\n[${label}] Exhausted retries for ${model}. Shifting to next...`);
     }
   }
 

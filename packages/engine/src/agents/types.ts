@@ -35,6 +35,37 @@ export interface AgentOutput {
 }
 
 // ─────────────────────────────────────────────
+// Autonomous Agent State Types
+// ─────────────────────────────────────────────
+
+export interface AgentState {
+  evidence: {
+    filesRead: string[];
+    symbolsObserved: string[];
+    dependenciesObserved: string[];
+    externalSchemasFound: Record<string, string>;
+    confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  };
+  plan: {
+    steps: string[];
+    currentStepIndex: number;
+    completedSteps: string[];
+  };
+  execution: {
+    filesModified: string[];
+    commandsRun: string[];
+    lastError: string | null;
+    consecutiveFailures: number;
+  };
+  verification: {
+    contractItems: string[];
+    passed: string[];
+    failed: string[];
+  };
+  verdict: 'IN_PROGRESS' | 'COMPLETE' | 'INCOMPLETE';
+}
+
+// ─────────────────────────────────────────────
 // Security Agent Types
 // ─────────────────────────────────────────────
 

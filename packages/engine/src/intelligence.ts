@@ -24,7 +24,7 @@ export class IntelligenceAgent {
 
   private async callLLM(prompt: string, cacheOpts?: { commitHash?: string, retrievalContextHash?: string, bypassCache?: boolean }): Promise<string> {
     const enabled = !cacheOpts?.bypassCache;
-    return generateWithRetry(this.client, prompt, { 
+    return generateWithRetry(this.client, prompt, {
       label: "IntelligenceAgent",
       cache: {
         enabled,
@@ -88,7 +88,7 @@ ${diff}
    */
   async generateRAGReview(diff: string, chunks: any[]): Promise<string> {
     const contextStr = chunks.map((c, i) => {
-      return `[Context Chunk ${i+1}] File: ${c.file} | Symbol: ${c.symbolPath || 'N/A'}
+      return `[Context Chunk ${i + 1}] File: ${c.file} | Symbol: ${c.symbolPath || 'N/A'}
 Code:
 ${c.content}`;
     }).join('\n\n---\n\n');
@@ -149,87 +149,7 @@ Use heavy markdown formatting (bolding, lists, code blocks with syntax highlight
     });
   }
 
-  /**
-   * Suggests optimizations and refactoring for a single file.
-   */
-  async generateSuggestions(fileContent: string): Promise<string> {
-    const prompt = `
-You are an AI pair programmer. Review the following code file and suggest improvements.
-Look for:
-1. Better abstractions
-2. Performance optimizations
-3. Code readability enhancements
 
-File Content:
-\`\`\`
-${fileContent}
-\`\`\`
-    `;
-
-    const result = await this.callLLM(prompt, {
-      commitHash: this.getCurrentCommitHash(),
-      retrievalContextHash: crypto.createHash("sha256").update(fileContent).digest("hex")
-    });
-    return result || "No suggestions generated.";
-  }
-
-  /**
-   * Automatically fixes nitbits in the provided file content.
-   */
-  async autoFix(fileContent: string): Promise<string> {
-    const prompt = `
-You are an automated code formatter and fixer.
-Fix any obvious linting errors, formatting inconsistencies, or minor nitbits in the following code.
-Return ONLY the completely fixed code, with no surrounding markdown or explanation, so it can be directly saved to the file.
-
-Code:
-\`\`\`
-${fileContent}
-\`\`\`
-    `;
-
-    let fixedCode = await this.callLLM(prompt, { bypassCache: true });
-    if (!fixedCode) return fileContent;
-    
-
-    if (fixedCode.startsWith("\`\`\`")) {
-      fixedCode = fixedCode.replace(/^\`\`\`[a-z]*\n/, "").replace(/\n\`\`\`$/, "");
-    }
-
-    return fixedCode;
-  }
-
-  /**
-   * Generates a basic code review for a PR diff without requiring context chunks.
-   */
-  async generateReview(diff: string): Promise<string> {
-    const prompt = `
-You are an expert Principal Software Engineer reviewing a pull request.
-You have been provided with the git diff of the pull request.
-
-Your task is to analyze the PR diff and provide a thorough code review.
-Focus on:
-1. Code quality and adherence to best practices
-2. Potential bugs or logic errors
-3. Performance implications
-4. Security considerations
-5. Design patterns and architecture
-
-At the end of your review, you MUST explicitly state whether the PR is "SAFE TO MERGE" or "REQUIRES CHANGES".
-
-Pull Request Diff:
-\`\`\`diff
-${diff}
-\`\`\`
-
-Format your review beautifully with markdown.
-    `;
-
-    const result = await this.callLLM(prompt, {
-      commitHash: this.getCurrentCommitHash()
-    });
-    return result || "No review generated.";
-  }
 
   /**
    * Performs Retrieval-Augmented Generation (RAG) by answering a query
@@ -237,7 +157,7 @@ Format your review beautifully with markdown.
    */
   async answerQueryWithContext(query: string, chunks: any[]): Promise<string> {
     const contextStr = chunks.map((c, i) => {
-      return `[Chunk ${i+1}] File: ${c.file} | Symbol: ${c.symbolPath || 'N/A'}
+      return `[Chunk ${i + 1}] File: ${c.file} | Symbol: ${c.symbolPath || 'N/A'}
 Code:
 ${c.content}`;
     }).join('\n\n---\n\n');
@@ -266,6 +186,64 @@ Your answer must follow these strict guidelines:
       commitHash: this.getCurrentCommitHash(),
       retrievalContextHash: this.computeChunksHash(chunks)
     });
+  }
+
+  /**
+   * Generates a detailed execution plan for a given task and context.
+   * This is used to pre-plan autonomous agent runs.
+   */
+  public async generateExecutionPlan(task: string, contextChunks: any[]): Promise<string> {
+    const contextStr = contextChunks.map((c, i) => {
+      return `[Chunk ${i + 1}] File: ${c.file} | Symbol: ${c.symbolPath || 'N/A'}\nCode:\n${c.content}`;
+    }).join('\n\n---\n\n');
+
+    const prompt = `You are an autonomous coding agent.
+
+# Task
+${task}
+
+# Relevant Codebase Context
+${contextStr}
+
+Analyze the task and available codebase context.
+
+Output ONLY a structured JSON execution plan containing the steps and the files that need to be read before the agent starts.
+
+Rules:
+* Maximum 7-10 steps.
+* Each step must be one sentence.
+* Focus only on actions required to complete the task.
+* Do not explain reasoning.
+* Do not describe implementation details.
+* Do not list speculative edge cases.
+* Do not create documentation-style plans and DO NOT commit anything.
+* Prefer concrete actions such as inspect, modify, implement, test, validate.
+* The plan should be very concise and easy to understand.
+* The filesToRead array must contain relative file paths of the files the agent MUST read to accomplish the task.
+* The summary should be a 3-5 word lowercase summary of the task (e.g. "refactor authentication middleware").
+
+Output format (Valid JSON only, no markdown formatting):
+{
+  "summary": "short task summary",
+  "steps": [
+    "Action step 1",
+    "Action step 2"
+  ],
+  "filesToRead": [
+    "path/to/file1.ts",
+    "path/to/file2.ts"
+  ]
+}`;
+
+    let result = await this.callLLM(prompt, {
+      commitHash: this.getCurrentCommitHash(),
+      retrievalContextHash: this.computeChunksHash(contextChunks)
+    });
+
+    if (result.startsWith("\`\`\`")) {
+      result = result.replace(/^\`\`\`[a-z]*\n/, "").replace(/\n\`\`\`$/, "");
+    }
+    return result;
   }
 
   /**

@@ -37,9 +37,9 @@ export class FileReadTool implements AgentTool {
       return "Error: Cannot read files outside the workspace directory.";
     }
 
-    // Security: block sensitive files
+    // Security: block sensitive files but allow examples
     const basename = path.basename(absolutePath);
-    if (basename.startsWith(".env") || basename === ".vortexenv") {
+    if ((basename.startsWith(".env") && basename !== ".env.example") || basename === ".vortexenv") {
       return "Error: Cannot read environment/secret files.";
     }
 

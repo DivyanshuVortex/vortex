@@ -26,7 +26,8 @@ export class Indexer {
     }
 
     const root = getGitRoot(cwd);
-    console.log(`Starting indexing for repository at ${root}`);
+    // Suppressed log for TUI
+    // console.log(`Starting indexing for repository at ${root}`);
 
 
     await initDatabase();
@@ -41,13 +42,15 @@ export class Indexer {
       ];
       return supportedExts.includes(ext) && !file.includes('node_modules');
     });
-    console.log(`Found ${files.length} supported source files.`);
+    // Suppressed log for TUI
+    // console.log(`Found ${files.length} supported source files.`);
 
     let totalChunks = 0;
 
     for (const file of files) {
       try {
-        console.log(`Processing ${file}...`);
+        // Suppressed log for TUI
+        // console.log(`Processing ${file}...`);
         const chunks = chunkFile(file);
 
         if (chunks.length === 0) {
@@ -72,15 +75,15 @@ export class Indexer {
     try {
       const indexData = this.bm25Index.exportIndex();
       fs.writeFileSync(bm25Path, JSON.stringify(indexData));
-      console.log(`BM25 index saved to ${bm25Path}`);
     } catch (err) {
       console.warn("Failed to persist BM25 index:", err);
     }
 
-    console.log(`\nIndexing complete.`);
-    console.log(`  Files processed: ${files.length}`);
-    console.log(`  Chunks indexed: ${totalChunks}`);
-    console.log(`  BM25 documents: ${this.bm25Index.documentCount}`);
+    // Suppressed logs for TUI
+    // console.log(`\nIndexing complete.`);
+    // console.log(`  Files processed: ${files.length}`);
+    // console.log(`  Chunks indexed: ${totalChunks}`);
+    // console.log(`  BM25 documents: ${this.bm25Index.documentCount}`);
 
     return {
       filesProcessed: files.length,
@@ -103,7 +106,7 @@ export class Indexer {
       return [];
     }
 
-    console.log(`Searching vector store...`);
+    if (process.env.DEBUG) console.log(`Searching vector store...`);
     const embedding = queryEmbedding[0];
     if (!embedding) {
       return [];
@@ -124,7 +127,7 @@ export class Indexer {
         try {
           const data = JSON.parse(fs.readFileSync(bm25Path, "utf-8"));
           this.bm25Index.importIndex(data);
-          console.log(`Loaded BM25 index (${this.bm25Index.documentCount} documents)`);
+          if (process.env.DEBUG) console.log(`Loaded BM25 index (${this.bm25Index.documentCount} documents)`);
         } catch (err) {
           console.warn("Failed to load BM25 index:", err);
         }
@@ -137,7 +140,7 @@ export class Indexer {
       this.embedder
     );
 
-    console.log(`Running hybrid search for: "${query}"...`);
+    if (process.env.DEBUG) console.log(`Running hybrid search for: "${query}"...`);
     const results = await retriever.search(query, { topK: limit });
 
     return results.map((r) => ({
@@ -165,4 +168,5 @@ export * from "./tools/file-read-tool";
 export * from "./tools/file-write-tool";
 export * from "./tools/shell-execute-tool";
 export * from "./tools/rag-search-tool";
+export * from "./tools/web-search-tool";
 export * from "./cache";

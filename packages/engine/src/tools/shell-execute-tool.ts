@@ -35,6 +35,10 @@ export class ShellExecuteTool implements AgentTool {
       return `Error: Command '${baseCmd}' is blacklisted for safety reasons.`;
     }
 
+    if ((command.includes(".env") && !command.includes(".env.example")) || command.includes(".vortexenv")) {
+      return "Error: Command attempts to interact with protected environment/secret files. Access denied.";
+    }
+
     if (this.approvalCallback) {
       const approved = await this.approvalCallback("shell_execute", command);
       if (!approved) {

@@ -16,6 +16,7 @@
     "@vortex/retrieval": "workspace:*",
     "@vortex/shared": "workspace:*",
     "groq-sdk": "^1.2.1",
+    "openai": "^6.44.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

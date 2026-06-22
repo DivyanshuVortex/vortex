@@ -28,9 +28,11 @@ export async function configSet(provider: string, value: string) {
     envKey = "GEMINI_API_KEY";
   } else if (providerUpper === "GROQ") {
     envKey = "GROQ_API_KEY";
+  } else if (providerUpper === "OPENROUTER") {
+    envKey = "OPENROUTER_API_KEY";
   } else {
-    console.log(chalk.red(`Invalid option: ${chalk.bold(provider)}. Supported options are 'gemini' and 'groq'.`));
-    console.log(chalk.gray(`Usage: vortex config set gemini <your-key>`));
+    console.log(chalk.red(`Invalid option: ${chalk.bold(provider)}. Supported options are 'gemini', 'groq', and 'openrouter'.`));
+    console.log(chalk.gray(`Usage: vortex config set openrouter <your-key>`));
     process.exit(1);
   }
 
