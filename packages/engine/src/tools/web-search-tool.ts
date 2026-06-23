@@ -2,13 +2,13 @@ import { AgentTool } from "./tool-types";
 
 export class WebSearchTool implements AgentTool {
   name = "web_search";
-  description = `Searches the web for information about third-party libraries.
-Use web_search ONLY when ALL of these are true:
-1. The task requires replacing or bridging an abstracted library.
-2. The library's internal schema/protocol is not visible in source code.
-3. No local documentation (README, tests, lock files) resolves the gap.
+  description = `Searches the web for information, documentation, and schemas about external APIs and third-party libraries.
+Use web_search when you need external context or run into an issue, such as:
+- The task requires using, replacing, or debugging an external library, API, or unknown concept.
+- You need documentation or examples to proceed.
+- You need to look up an error message or how to fix a build/compilation error.
 
-You MUST perform the search exactly once, extract the schema, and cache it as an observed fact in your Evidence Summary. Do not perform repeated searches for the same library.
+You MUST perform the search to guide your code modifications.
 Provide the 'query' argument with your search terms.`;
 
   async execute(args: Record<string, string>): Promise<string> {

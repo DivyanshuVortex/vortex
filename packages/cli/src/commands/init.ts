@@ -24,8 +24,7 @@ export async function initCommand(options: any) {
       let content = fs.readFileSync(gitignorePath, "utf8");
       const entriesToAdd = [
         ".vortex.db",
-        ".vortex-bm25.json",
-        ".vortex_backup/"
+        ".vortex-bm25.json"
       ];
       
       let changed = false;

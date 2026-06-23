@@ -1,6 +1,6 @@
 {
   "name": "@vortex-ai/cli",
-  "version": "0.1.50",
+  "version": "0.1.70",
   "description": "Vortex CLI - The main entry point",
   "main": "./dist/index.js",
   "bin": {
@@ -12,7 +12,8 @@
     "watch": "tsup src/index.ts --format cjs,esm --watch",
     "lint": "eslint .",
     "check-types": "tsc --noEmit",
-    "postinstall": "node -e \"const fs=require('fs'); if(fs.existsSync('./schema.prisma')){require('child_process').execSync('npx prisma generate --schema=./schema.prisma', {stdio:'inherit'})}\""
+    "postinstall": "node -e \"const fs=require('fs'); if(fs.existsSync('./schema.prisma')){require('child_process').execSync('npx prisma generate --schema=./schema.prisma', {stdio:'inherit'})}\"",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@octokit/rest": "^22.0.1",

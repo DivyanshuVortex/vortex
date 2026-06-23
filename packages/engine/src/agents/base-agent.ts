@@ -54,6 +54,7 @@ export abstract class BaseAgent {
       onToolResult?: (toolName: string, result: string) => void;
       initialState?: AgentState;
       maxSteps?: number;
+      verifyCommand?: string | boolean;
     }
   ): Promise<AgentOutput> {
     const prompt = this.buildPrompt(input);
@@ -92,6 +93,7 @@ export abstract class BaseAgent {
       onToolCall?: (toolName: string, args: Record<string, string>) => void;
       onToolResult?: (toolName: string, result: string) => void;
       initialState?: AgentState;
+      verifyCommand?: string | boolean;
     }
   ): Promise<string> {
     let currentPrompt = prompt;
@@ -106,11 +108,7 @@ export abstract class BaseAgent {
     };
 
     while (iterations < this.maxToolIterations) {
-      if (state.verdict !== 'IN_PROGRESS') {
-        currentPrompt += `\n\n[System] Orchestrator determined verdict is ${state.verdict}. Providing final response.`;
-        break;
-      }
-
+      // Orchestrator Intervention moved below state merge
       const promptWithState = `${currentPrompt}\n\nCURRENT AGENT STATE:\n\`\`\`json\n${JSON.stringify(state, null, 2)}\n\`\`\`\n\nPlease output your <state_update> and <tool_calls>. If you are completely finished, output FINAL_ANSWER in your response.`;
 
       let response = await this.generateWithRetry(promptWithState);
@@ -126,6 +124,43 @@ export abstract class BaseAgent {
       const stateUpdateMatch = response.match(/<state_update>([\s\S]*?)<\/state_update>/i);
       if (stateUpdateMatch && stateUpdateMatch[1]) {
         this.mergeStateUpdate(state, stateUpdateMatch[1]);
+      }
+
+      // Orchestrator Verification Intervention
+      if (state.verdict === 'COMPLETE') {
+        if (options?.verifyCommand) {
+          const cmd = typeof options.verifyCommand === 'string' ? options.verifyCommand : 'npm run build';
+          currentPrompt += `\n\n[System - Orchestrator Intervention] You marked the task as COMPLETE. Running verification command: \`${cmd}\`...`;
+          let verifySuccess = false;
+          let verifyOutput = "";
+          try {
+            const { execSync } = require('child_process');
+            const env = { ...process.env };
+            delete env.NODE_ENV;
+            verifyOutput = execSync(cmd, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], env });
+            verifySuccess = true;
+          } catch (e: any) {
+            verifyOutput = (e.stdout ? e.stdout.toString() : '') + '\n' + (e.stderr ? e.stderr.toString() : e.message);
+          }
+          if (verifySuccess) {
+            if (response.includes("FINAL_ANSWER")) return response;
+            currentPrompt += `\nVerification succeeded.\nOutput:\n${verifyOutput}\n\nTask is verified as complete.`;
+            break;
+          } else {
+            state.verdict = 'IN_PROGRESS';
+            currentPrompt += `\nVerification FAILED. You must fix these errors before the task can be marked as complete.\nOutput:\n${verifyOutput}`;
+            iterations++;
+            continue;
+          }
+        } else {
+          if (response.includes("FINAL_ANSWER")) return response;
+          currentPrompt += `\n\n[System] Orchestrator determined verdict is ${state.verdict}. Providing final response.`;
+          break;
+        }
+      } else if (state.verdict === 'INCOMPLETE') {
+        if (response.includes("FINAL_ANSWER")) return response;
+        currentPrompt += `\n\n[System] Orchestrator determined verdict is ${state.verdict}. Providing final response.`;
+        break;
       }
 
       // Enforce Confidence Gate explicitly
@@ -292,15 +327,13 @@ export abstract class BaseAgent {
         }
       }
 
-      if (Object.keys(args).length === 0 || (name === 'write_file' && (!args.path || !args.content)) || (name === 'replace_in_file' && (!args.path || (!args.target && !args.replacement)))) {
-        const directTagRegex = /<([a-zA-Z0-9_]+)>\s*([\s\S]*?)\s*<\/\1>/g;
-        let directMatch;
-        while ((directMatch = directTagRegex.exec(blockContent)) !== null) {
-          if (directMatch[1] && directMatch[2]) {
-            const key = directMatch[1].trim();
-            if (key !== 'tool_call' && key !== 'tool_name' && key !== 'name' && key !== 'arg_key' && key !== 'arg_value') {
-              args[key] = directMatch[2].trim();
-            }
+      const directTagRegex = /<([a-zA-Z0-9_]+)>\s*([\s\S]*?)\s*<\/\1>/g;
+      let directMatch;
+      while ((directMatch = directTagRegex.exec(blockContent)) !== null) {
+        if (directMatch[1] && directMatch[2]) {
+          const key = directMatch[1].trim();
+          if (key !== 'tool_call' && key !== 'tool_name' && key !== 'name' && key !== 'arg_key' && key !== 'arg_value') {
+            args[key] = directMatch[2].trim();
           }
         }
       }

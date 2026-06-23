@@ -97,7 +97,8 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
       stepCount = parsedPlan.steps ? parsedPlan.steps.length : 0;
       executionPlan = parsedPlan.steps ? parsedPlan.steps.map((s: any, i: number) => {
         if (typeof s === 'string') return `${i + 1}. ${s}`;
-        return `${i + 1}. [${(s.action || 'MODIFY').toUpperCase()}] ${s.file || 'General'}\n   ${s.description}`;
+        const desc = s.description ? s.description.replace(/\n/g, '\n   ') : '';
+        return `${i + 1}. [${(s.action || 'MODIFY').toUpperCase()}] ${s.file || 'General'}\n   ${desc}`;
       }).join("\n\n") : executionPlanStr;
       filesToRead = parsedPlan.filesToRead || [];
     } catch {
@@ -184,6 +185,19 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
       verdict: 'IN_PROGRESS' as any
     };
 
+    let verifyCmd = options.verify;
+    if (verifyCmd === undefined || verifyCmd === true) {
+      const packageJsonPath = path.join(cwd, "package.json");
+      if (fs.existsSync(packageJsonPath)) {
+        try {
+          const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
+          if (pkg.scripts && pkg.scripts.build) {
+            verifyCmd = "npm run build";
+          }
+        } catch (e) { }
+      }
+    }
+
     const result = await agent.run(
       {
         diff: enrichedPrompt,
@@ -191,7 +205,7 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
       },
       {
         initialState,
-        verifyCommand: options.verify,
+        verifyCommand: verifyCmd,
         onToolCall: (toolName, args) => {
           if (toolName === "write_file") {
             spinner.text = `Writing ${args.path}...`;
@@ -252,27 +266,6 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
       console.log(`  ────────────────────────────────────────\n`);
     }
 
-    if (isComplete) {
-      const packageJsonPath = path.join(cwd, "package.json");
-      if (fs.existsSync(packageJsonPath)) {
-        try {
-          const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
-          if (pkg.scripts && pkg.scripts.build) {
-            console.log(`\n${chalk.cyan('=== Verification ===')}`);
-            const buildSpinner = ora("Running build command...").start();
-            try {
-              const env = { ...process.env };
-              delete env.NODE_ENV;
-              execSync("npm run build", { stdio: "pipe", cwd, env });
-              buildSpinner.succeed("Build completed successfully.");
-            } catch (e: any) {
-              buildSpinner.fail("Build failed.");
-              console.error(chalk.red(e.stdout ? e.stdout.toString() : e.message));
-            }
-          }
-        } catch (e) { }
-      }
-    }
   } catch (err: any) {
     spinner.fail("Agent encountered an error");
     console.error(err.message);

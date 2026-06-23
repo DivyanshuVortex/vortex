@@ -64,17 +64,6 @@ export class FileWriteTool implements AgentTool {
         fs.mkdirSync(dir, { recursive: true });
       }
 
-      // Rollback mechanism: Backup existing file before overwrite
-      if (fs.existsSync(absolutePath)) {
-        const backupDir = path.join(this.cwd, ".vortex_backup");
-        if (!fs.existsSync(backupDir)) {
-          fs.mkdirSync(backupDir, { recursive: true });
-        }
-        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-        const backupPath = path.join(backupDir, `${timestamp}_${basename}`);
-        fs.copyFileSync(absolutePath, backupPath);
-      }
-      
       fs.writeFileSync(absolutePath, content, "utf8");
       
       let ragMessage = "";
