@@ -83,8 +83,27 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
       }
     }
 
-    spinner.text = "Planning approach...";
     const intelligenceAgent = new IntelligenceAgent();
+    const webSearchTool = new WebSearchTool();
+
+    spinner.text = "Gathering external context...";
+    const webQueries = await intelligenceAgent.extractWebSearchQueries(prompt);
+    for (const q of webQueries.slice(0, 2)) {
+      try {
+        const res = await webSearchTool.execute({ query: q });
+        if (!res.includes("Error: TAVILY") && res.trim().length > 0) {
+          options.contextChunks = options.contextChunks || [];
+          options.contextChunks.push({
+            file: "Web Search Result",
+            symbolPath: q,
+            content: res,
+            kind: "web_search"
+          });
+        }
+      } catch (e) {}
+    }
+
+    spinner.text = "Planning approach...";
     let executionPlanStr = await intelligenceAgent.generateExecutionPlan(prompt, options.contextChunks || []);
     
     let planSummary = "task";
@@ -169,8 +188,8 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
 
     agent.registerTools([
       new FileReadTool(rootPath),
-      new FileWriteTool(rootPath, vectorStore, embedder, approvalCallback),
-      new FileEditTool(rootPath, vectorStore, embedder, approvalCallback),
+      new FileWriteTool(rootPath, vectorStore, embedder, bm25Index, approvalCallback),
+      new FileEditTool(rootPath, vectorStore, embedder, bm25Index, approvalCallback),
       new ShellExecuteTool(rootPath, approvalCallback),
       new GrepTool(rootPath),
       new RagSearchTool(hybridRetriever),
@@ -218,17 +237,35 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
           }
         },
         onToolResult: (toolName, toolResult) => {
-          if (toolName === "write_file" && toolResult.startsWith("Success")) {
+          if ((toolName === "write_file" || toolName === "replace_in_file") && toolResult.startsWith("Success")) {
             spinner.stop();
             try {
-              const match = toolResult.match(/Wrote to (.*) successfully/);
-              if (match && match[1]) {
-                const filePath = match[1];
-                const diffOut = execSync(`git diff --numstat ${filePath}`, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
-                const diffParts = diffOut.split(/\s+/);
-                const additions = diffParts[0] || '0';
-                const deletions = diffParts[1] || '0';
-                console.log(`  ${chalk.cyan('●')} Writing ${filePath}`);
+              let filePath = "";
+              const matchWrite = toolResult.match(/Wrote to (.*?) successfully/);
+              const matchReplace = toolResult.match(/target block in (.*?) successfully/);
+              
+              if (matchWrite && matchWrite[1]) filePath = matchWrite[1].trim();
+              else if (matchReplace && matchReplace[1]) filePath = matchReplace[1].trim();
+
+              if (filePath) {
+                let additions = '0';
+                let deletions = '0';
+                const diffOut = execSync(`git diff --numstat "${filePath}"`, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+                
+                if (diffOut) {
+                  const diffParts = diffOut.split(/\s+/);
+                  additions = diffParts[0] || '0';
+                  deletions = diffParts[1] || '0';
+                } else {
+                  try {
+                    const fullPath = path.resolve(rootPath, filePath);
+                    const content = fs.readFileSync(fullPath, "utf-8");
+                    additions = content.split('\n').length.toString();
+                  } catch (e) {}
+                }
+                
+                const actionText = toolName === "replace_in_file" ? "Editing" : "Writing";
+                console.log(`  ${chalk.cyan('●')} ${actionText} ${filePath}`);
                 console.log(`    ${chalk.green(`+ ${additions} lines`)}  ·  ${chalk.red(`- ${deletions} lines`)}\n`);
               }
             } catch (e) {
@@ -242,14 +279,14 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
     let iterationCount = 1;
     if (result.summary) {
        const iterMatch = result.summary.match(/Iter (\d+)/);
-       if (iterMatch) iterationCount = parseInt(iterMatch[1], 10);
+       if (iterMatch && iterMatch[1]) iterationCount = parseInt(iterMatch[1], 10);
     }
     
     let filesChangedCount = 0;
     try {
       const statOut = execSync(`git diff --shortstat`, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
       const filesMatch = statOut.match(/(\d+) file/);
-      if (filesMatch) {
+      if (filesMatch && filesMatch[1]) {
          filesChangedCount = parseInt(filesMatch[1], 10);
       }
     } catch (e) {}

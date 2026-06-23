@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { AgentTool, ApprovalCallback } from "./tool-types";
-import { VectorStore, LocalEmbedder, chunkFile } from "@vortex/retrieval";
+import { VectorStore, LocalEmbedder, chunkFile, BM25Index } from "@vortex/retrieval";
 
 /**
  * FileWriteTool — Writes a file to the local codebase.
@@ -17,12 +17,14 @@ export class FileWriteTool implements AgentTool {
   private cwd: string;
   private vectorStore?: VectorStore;
   private embedder?: LocalEmbedder;
+  private bm25Index?: BM25Index;
   private approvalCallback?: ApprovalCallback;
 
-  constructor(cwd?: string, vectorStore?: VectorStore, embedder?: LocalEmbedder, approvalCallback?: ApprovalCallback) {
+  constructor(cwd?: string, vectorStore?: VectorStore, embedder?: LocalEmbedder, bm25Index?: BM25Index, approvalCallback?: ApprovalCallback) {
     this.cwd = cwd || process.cwd();
     this.vectorStore = vectorStore;
     this.embedder = embedder;
+    this.bm25Index = bm25Index;
     this.approvalCallback = approvalCallback;
   }
 
@@ -70,10 +72,23 @@ export class FileWriteTool implements AgentTool {
       // RAG Synchronization: Index the newly written file
       if (this.vectorStore && this.embedder) {
         try {
+          const oldIds = await this.vectorStore.getIdsByFile(absolutePath);
+          if (oldIds.length > 0) {
+            await this.vectorStore.deleteByFile(absolutePath);
+            if (this.bm25Index) {
+              this.bm25Index.removeDocuments(oldIds);
+            }
+          }
+
           const chunks = chunkFile(absolutePath);
           if (chunks.length > 0) {
             const embeddings = await this.embedder.embedChunks(chunks);
             await this.vectorStore.upsert(chunks, embeddings);
+            if (this.bm25Index) {
+              this.bm25Index.addDocuments(chunks);
+              const bm25Path = path.join(this.cwd, ".vortex-bm25.json");
+              fs.writeFileSync(bm25Path, JSON.stringify(this.bm25Index.exportIndex()));
+            }
             ragMessage = " (Successfully synced to Project Memory/RAG)";
           }
         } catch (ragErr: any) {

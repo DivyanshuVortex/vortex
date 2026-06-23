@@ -126,42 +126,7 @@ export abstract class BaseAgent {
         this.mergeStateUpdate(state, stateUpdateMatch[1]);
       }
 
-      // Orchestrator Verification Intervention
-      if (state.verdict === 'COMPLETE') {
-        if (options?.verifyCommand) {
-          const cmd = typeof options.verifyCommand === 'string' ? options.verifyCommand : 'npm run build';
-          currentPrompt += `\n\n[System - Orchestrator Intervention] You marked the task as COMPLETE. Running verification command: \`${cmd}\`...`;
-          let verifySuccess = false;
-          let verifyOutput = "";
-          try {
-            const { execSync } = require('child_process');
-            const env = { ...process.env };
-            delete env.NODE_ENV;
-            verifyOutput = execSync(cmd, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], env });
-            verifySuccess = true;
-          } catch (e: any) {
-            verifyOutput = (e.stdout ? e.stdout.toString() : '') + '\n' + (e.stderr ? e.stderr.toString() : e.message);
-          }
-          if (verifySuccess) {
-            if (response.includes("FINAL_ANSWER")) return response;
-            currentPrompt += `\nVerification succeeded.\nOutput:\n${verifyOutput}\n\nTask is verified as complete.`;
-            break;
-          } else {
-            state.verdict = 'IN_PROGRESS';
-            currentPrompt += `\nVerification FAILED. You must fix these errors before the task can be marked as complete.\nOutput:\n${verifyOutput}`;
-            iterations++;
-            continue;
-          }
-        } else {
-          if (response.includes("FINAL_ANSWER")) return response;
-          currentPrompt += `\n\n[System] Orchestrator determined verdict is ${state.verdict}. Providing final response.`;
-          break;
-        }
-      } else if (state.verdict === 'INCOMPLETE') {
-        if (response.includes("FINAL_ANSWER")) return response;
-        currentPrompt += `\n\n[System] Orchestrator determined verdict is ${state.verdict}. Providing final response.`;
-        break;
-      }
+      // Orchestrator Verification Intervention has been moved after tools
 
       // Enforce Confidence Gate explicitly
       if (state.evidence.confidence === 'LOW' && state.plan.steps.length > 0) {
@@ -178,21 +143,23 @@ export abstract class BaseAgent {
           return response;
         }
 
-        if (!response.trim()) {
-          currentPrompt += `\n\n[System] Your response was completely empty. You must emit <state_update> and <tool_calls> or provide FINAL_ANSWER.`;
+        if (state.verdict !== 'COMPLETE' && state.verdict !== 'INCOMPLETE') {
+          if (!response.trim()) {
+            currentPrompt += `\n\n[System] Your response was completely empty. You must emit <state_update> and <tool_calls> or provide FINAL_ANSWER.`;
+            iterations++;
+            continue;
+          }
+
+          if (response.includes("<think>") && !response.toLowerCase().includes("final") && !response.toLowerCase().includes("answer")) {
+            currentPrompt += `\n\n${response}\n\n[System] You provided a thought block but no tool calls and no FINAL_ANSWER.`;
+            iterations++;
+            continue;
+          }
+
+          currentPrompt += `\n\n[System] You did not call a tool and did not state FINAL_ANSWER. You must either call tools or explicitely write "FINAL_ANSWER" to complete the task.`;
           iterations++;
           continue;
         }
-
-        if (response.includes("<think>") && !response.toLowerCase().includes("final") && !response.toLowerCase().includes("answer")) {
-          currentPrompt += `\n\n${response}\n\n[System] You provided a thought block but no tool calls and no FINAL_ANSWER.`;
-          iterations++;
-          continue;
-        }
-
-        currentPrompt += `\n\n[System] You did not call a tool and did not state FINAL_ANSWER. You must either call tools or explicitely write "FINAL_ANSWER" to complete the task.`;
-        iterations++;
-        continue;
       }
 
       let toolResultsPrompts = "";
@@ -250,7 +217,44 @@ export abstract class BaseAgent {
         state.execution.lastError = null;
       }
 
-      currentPrompt += `\n\nOBSERVATIONS (${toolCalls.length} results):${toolResultsPrompts}`;
+      if (toolCalls && toolCalls.length > 0) {
+        currentPrompt += `\n\nOBSERVATIONS (${toolCalls.length} results):${toolResultsPrompts}`;
+      }
+
+      // Orchestrator Verification Intervention
+      if (state.verdict === 'COMPLETE') {
+        if (options?.verifyCommand) {
+          const cmd = typeof options.verifyCommand === 'string' ? options.verifyCommand : 'npm run build';
+          currentPrompt += `\n\n[System - Orchestrator Intervention] You marked the task as COMPLETE. Running verification command: \`${cmd}\`...`;
+          let verifySuccess = false;
+          let verifyOutput = "";
+          try {
+            const { execSync } = require('child_process');
+            const env = { ...process.env };
+            delete env.NODE_ENV;
+            verifyOutput = execSync(cmd, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], env });
+            verifySuccess = true;
+          } catch (e: any) {
+            verifyOutput = (e.stdout ? e.stdout.toString() : '') + '\n' + (e.stderr ? e.stderr.toString() : e.message);
+          }
+          if (verifySuccess) {
+            if (response.includes("FINAL_ANSWER")) return response;
+            currentPrompt += `\nVerification succeeded.\nOutput:\n${verifyOutput}\n\nTask is verified as complete.`;
+            break;
+          } else {
+            state.verdict = 'IN_PROGRESS';
+            currentPrompt += `\nVerification FAILED. You must fix these errors before the task can be marked as complete.\nOutput:\n${verifyOutput}`;
+          }
+        } else {
+          if (response.includes("FINAL_ANSWER")) return response;
+          currentPrompt += `\n\n[System] Orchestrator determined verdict is ${state.verdict}. Providing final response.`;
+          break;
+        }
+      } else if (state.verdict === 'INCOMPLETE') {
+        if (response.includes("FINAL_ANSWER")) return response;
+        currentPrompt += `\n\n[System] Orchestrator determined verdict is ${state.verdict}. Providing final response.`;
+        break;
+      }
       iterations++;
     }
 

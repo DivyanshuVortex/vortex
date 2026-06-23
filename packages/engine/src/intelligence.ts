@@ -74,6 +74,28 @@ export class IntelligenceAgent {
   }
 
   /**
+   * Extracts web search queries from a task description.
+   */
+  async extractWebSearchQueries(task: string): Promise<string[]> {
+    const prompt = Prompts.extractWebSearchQueries(task);
+
+    try {
+      let result = await this.callLLM(prompt, { bypassCache: true });
+      if (result.startsWith("\`\`\`")) {
+        result = result.replace(/^\`\`\`[a-z]*\n/, "").replace(/\n\`\`\`$/, "");
+      }
+      const queries = JSON.parse(result);
+      if (Array.isArray(queries)) {
+        return queries;
+      }
+      return [];
+    } catch (err) {
+      console.warn("Failed to extract web search queries:", err);
+      return [];
+    }
+  }
+
+  /**
    * Expands a single query into 3-5 variants for better retrieval recall.
    */
   async expandQuery(query: string): Promise<string[]> {

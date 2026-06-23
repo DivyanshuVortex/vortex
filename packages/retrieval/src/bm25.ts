@@ -67,6 +67,14 @@ export class BM25Index {
     }
   }
 
+  public removeDocuments(chunkIds: string[]): void {
+    for (const id of chunkIds) {
+      try {
+        this.index.discard(id);
+      } catch {}
+    }
+  }
+
   /**
    * Removes all documents and rebuilds the index from the given chunks.
    * Use this during `vortex init --reindex`.

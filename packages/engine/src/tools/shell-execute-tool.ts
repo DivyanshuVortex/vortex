@@ -48,6 +48,11 @@ export class ShellExecuteTool implements AgentTool {
 
     try {
       const { stdout, stderr } = await execAsync(command, { cwd: this.cwd });
+      
+      if (command.includes("install")) {
+        await new Promise((resolve) => setTimeout(resolve, 15000));
+      }
+
       let result = "";
       if (stdout) {
         result += `STDOUT:\n${stdout}\n`;

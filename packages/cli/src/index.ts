@@ -64,9 +64,14 @@ program.hook("preAction", async (thisCommand, actionCommand) => {
     
     if (process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY || process.env.GROQ_API_KEY) {
        const priorityString = process.env.VORTEX_MODEL_PRIORITY;
-       const models = priorityString 
+       const { DEFAULT_MODEL_PRIORITY, LLMCacheManager } = await import("@vortex/engine");
+       let models = priorityString 
          ? priorityString.split(",").map(s => s.trim()).filter(Boolean)
-         : ["nvidia/nemotron-3-ultra-550b-a55b:free", "nex-agi/nex-n2-pro:free", "openrouter/owl-alpha", "gemini-2.5-flash"];
+         : DEFAULT_MODEL_PRIORITY;
+       const workingModel = await LLMCacheManager.getWorkingModel();
+       if (workingModel && models.includes(workingModel)) {
+         models = [workingModel, ...models.filter((m: string) => m !== workingModel)];
+       }
        const topModel = models[0] || "gemini";
        spinner.succeed(`Model router active  ·  priority: ${topModel}\n`);
     } else {

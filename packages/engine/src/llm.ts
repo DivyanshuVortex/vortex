@@ -14,7 +14,7 @@ export interface GenerateOptions {
   };
 }
 
-const DEFAULT_MODEL_PRIORITY = [
+export const DEFAULT_MODEL_PRIORITY = [
   // Gemini
   "gemini-2.5-flash",
   "gemini-3.1-flash-lite",

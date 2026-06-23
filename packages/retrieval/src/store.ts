@@ -60,6 +60,20 @@ export class VectorStore {
     );
   }
 
+  public async getIdsByFile(file: string): Promise<string[]> {
+    const chunks = await prisma.chunk.findMany({
+      where: { file },
+      select: { id: true }
+    });
+    return chunks.map(c => c.id);
+  }
+
+  public async deleteByFile(file: string): Promise<void> {
+    await prisma.chunk.deleteMany({
+      where: { file }
+    });
+  }
+
   public async search(queryEmbedding: number[], limit: number = 5, filter?: SearchFilter): Promise<Chunk[]> {
 
     const whereClause: any = {};

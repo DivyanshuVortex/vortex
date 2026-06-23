@@ -17,6 +17,14 @@ Diff:
 ${diff}
 \`\`\``,
 
+  extractWebSearchQueries: (task: string) => `You must return ONLY a valid JSON array of up to 2 strings. Example: ["latest React router v6 syntax", "Stripe API create checkout session"]
+
+You are an expert AI Software Architect planning a new task.
+Analyze the following user task and extract 1 or 2 targeted web search queries that would help gather external documentation, library usage, or schemas needed to solve this task. If the task requires no external knowledge (purely local logic), return an empty array [].
+
+Task:
+${task}`,
+
   ragReview: (diff: string, contextStr: string) => `
 You are an expert Principal Software Engineer reviewing a pull request.
 You have been provided with the git diff of the pull request, AND some relevant code chunks from the existing codebase for context.
@@ -96,9 +104,10 @@ Your answer must follow these strict guidelines:
 You are a Principal AI Software Architect. Analyze the task and the extensive codebase context provided below to create a highly detailed, step-by-step execution plan.
 
 Rules:
-- Break the implementation down into MANY granular, sequential steps. Do not cram everything into one step.
+- Break the implementation down into MANY granular, sequential steps. Do not cram everything into one step. The plan MUST be highly detailed.
+- You MUST rely on the provided RAG model contexts extensively. Reference these code contexts to ensure your plan is accurate and integrates seamlessly.
 - Explain the 'why' and the exact 'how' for each step. Provide exact code snippets or precise line-replacements using '\\n' for newlines so it renders beautifully in the terminal.
-- Include precise implementation details: exact function signatures, variable names, logic branches, and edge cases.
+- Include precise implementation details: exact function signatures, variable names, logic branches, and edge cases based on the existing context.
 - Anticipate potential build errors and proactively address them in your steps.
 - Make sure to identify all related files that need to be read or modified.
 - Output ONLY valid JSON.
