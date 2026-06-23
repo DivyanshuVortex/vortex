@@ -1,7 +1,7 @@
 # Vortex - Developer Intelligence & PR Review Engine
 
-![npm version](https://img.shields.io/npm/v/vortex-cli)
-![Node.js Version](https://img.shields.io/node/v/vortex-cli)
+![npm version](https://img.shields.io/npm/v/@vortex-ai/cli)
+![Node.js Version](https://img.shields.io/node/v/@vortex-ai/cli)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 **Vortex** is an autonomous, AI-powered developer assistant and CLI tool that combines semantic code search, Git integration, and LLM-based intelligence. It provides contextual code reviews, deeply technical issue analysis, interactive semantic search, and an autonomous coding agent to help you solve tasks right in your terminal.
@@ -14,7 +14,7 @@
 
 Install Vortex globally via npm:
 ```bash
-npm install -g vortex-cli
+npm i -g @vortex-ai/cli
 ```
 
 ### Configuration

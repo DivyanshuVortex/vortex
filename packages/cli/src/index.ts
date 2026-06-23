@@ -38,6 +38,7 @@ import { graphCommand } from "./commands/graph";
 import { solveCommand } from "./commands/solve";
 import { solveIssueCommand } from "./commands/solve-issue";
 import { cacheCommand } from "./commands/cache";
+import { configSet, configList } from "./commands/config";
 
 const program = new Command();
 
@@ -135,6 +136,11 @@ program
   .action(solveIssueCommand);
 
 // ── AI-Powered Commands ──
+
+const configCmd = new Command("config").description("Manage global configuration");
+configCmd.command("set <provider> <value>").description("Set a configuration value").action(configSet);
+configCmd.command("list").description("List all configuration values").action(configList);
+program.addCommand(configCmd);
 
 program.addCommand(cacheCommand);
 
