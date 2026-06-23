@@ -14,7 +14,7 @@
 
 Install Vortex globally via npm:
 ```bash
-npm install -g vortex-cli
+npm install -g @vortex-ai/cli
 ```
 
 ### Configuration

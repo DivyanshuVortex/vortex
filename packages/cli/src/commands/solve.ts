@@ -292,7 +292,7 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
     } catch (e) {}
 
     spinner.stop();
-    const isIncomplete = result.verdict === 'INCOMPLETE' || result.state?.verdict === 'INCOMPLETE';
+    const isIncomplete = (result as any).verdict === 'INCOMPLETE' || result.state?.verdict === 'INCOMPLETE';
     const isComplete = !isIncomplete;
 
     if (isIncomplete) {
