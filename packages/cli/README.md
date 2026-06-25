@@ -156,7 +156,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ### Development Setup
 ```bash
-git clone https://github.com/your-org/vortex.git
+git clone https://github.com/DivyanshuVortex/vortex.git
 cd vortex
 npm install
 npm run build

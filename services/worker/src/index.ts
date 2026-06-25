@@ -3,6 +3,15 @@ import { connection } from './redis';
 import handleIndexRepo from './jobs/indexRepo';
 import handleReviewPR from './jobs/reviewPR';
 
+/**
+ * VORTEX CLOUD WORKER
+ * 
+ * Note: This service is exclusively for running Vortex as a backend API/Server 
+ * (e.g. for handling GitHub webhooks, asynchronous jobs, etc).
+ * 
+ * It is NOT used by the local CLI (`vortex init` or `vortex solve`). The CLI 
+ * bypasses this worker and Redis entirely to run tasks synchronously.
+ */
 const QUEUE_NAME = 'vortex-jobs';
 
 console.log(`Starting Vortex Worker... Listening on queue: ${QUEUE_NAME}`);

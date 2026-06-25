@@ -91,3 +91,4 @@ Desktop.ini
 *.pem
 *.tgz
 .vortex-bm25.json
+.vortex.db

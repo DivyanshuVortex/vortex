@@ -55,7 +55,12 @@ vortex review --pr 42
 ## Core Features
 
 - **`vortex solve <prompt>`**: Autonomous AI agent that explores your codebase, writes code, and executes terminal commands to solve your task.
+  - `--auto-approve`: Skip interactive prompts for file writes and shell commands.
+  - `--max-steps <number>`: Maximum number of agent loop iterations (default: 30).
+  - `--new-project <folder>`: Create a new project folder and initialize git before solving.
+  - `--verify [command]`: Run a verification command after completion (e.g., 'npm run check-types'). Agent will self-correct on failure.
 - **`vortex solve-issue --id <id>`**: Seamlessly connects GitHub issues with the Autonomous Agent. Fetches the issue, runs RAG to find relevant local code, and automatically writes the fix.
+  - Accepts `--auto-approve`, `--max-steps`, and `--verify` flags just like the solve command.
 - **`vortex review --pr <id>`**: Multi-agent PR review analyzing security, architecture, and logic.
 - **`vortex search -q <query>`**: Semantic, natural language code search backed by AI explanations.
 - **`vortex issue --id <id>`**: Analyzes GitHub issues and proposes step-by-step local code fixes.
@@ -156,7 +161,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ### Development Setup
 ```bash
-git clone https://github.com/your-org/vortex.git
+git clone https://github.com/DivyanshuVortex/vortex.git
 cd vortex
 npm install
 npm run build
