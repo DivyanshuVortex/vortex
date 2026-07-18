@@ -300,6 +300,27 @@ export abstract class BaseAgent {
     }
   }
 
+  /**
+   * Decode XML content: strip CDATA wrappers and unescape XML entities.
+   * LLMs often wrap file content in CDATA or escape < > & characters.
+   */
+  private decodeXmlContent(value: string): string {
+    let decoded = value;
+    // Strip CDATA wrappers: <![CDATA[...]]>
+    const cdataMatch = decoded.match(/^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/);
+    if (cdataMatch && cdataMatch[1] !== undefined) {
+      decoded = cdataMatch[1];
+    }
+    // Decode XML entities
+    decoded = decoded
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'");
+    return decoded;
+  }
+
   private extractToolCalls(
     response: string
   ): { name: string; args: Record<string, string>; isXml?: boolean; prefix?: string }[] {
@@ -327,17 +348,22 @@ export abstract class BaseAgent {
       let match;
       while ((match = argRegex.exec(blockContent)) !== null) {
         if (match[2] && match[4]) {
-          args[match[2].trim()] = match[4].trim();
+          args[match[2].trim()] = this.decodeXmlContent(match[4].trim());
         }
       }
 
-      const directTagRegex = /<([a-zA-Z0-9_]+)>\s*([\s\S]*?)\s*<\/\1>/g;
+      const directTagRegex = /<([a-zA-Z0-9_]+)>([\s\S]*?)<\/\1>/g;
       let directMatch;
       while ((directMatch = directTagRegex.exec(blockContent)) !== null) {
-        if (directMatch[1] && directMatch[2]) {
+        if (directMatch[1] && directMatch[2] !== undefined) {
           const key = directMatch[1].trim();
           if (key !== 'tool_call' && key !== 'tool_name' && key !== 'name' && key !== 'arg_key' && key !== 'arg_value') {
-            args[key] = directMatch[2].trim();
+            // For file content, only trim leading/trailing newlines, preserve internal whitespace
+            const rawValue = directMatch[2];
+            const trimmedValue = key === 'content'
+              ? rawValue.replace(/^\n/, '').replace(/\n\s*$/, '')
+              : rawValue.trim();
+            args[key] = this.decodeXmlContent(trimmedValue);
           }
         }
       }

@@ -1,0 +1,20 @@
+{
+  "name": "@vortex/harness",
+  "version": "1.0.0",
+  "description": "Evaluation harness for vortex agents",
+  "main": "src/runner.ts",
+  "scripts": {
+    "eval": "tsx src/runner.ts"
+  },
+  "dependencies": {
+    "@vortex/engine": "workspace:*",
+    "chalk": "^5.3.0",
+    "commander": "^11.0.0",
+    "dotenv": "^17.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.16.2",
+    "typescript": "5.9.2"
+  }
+}
