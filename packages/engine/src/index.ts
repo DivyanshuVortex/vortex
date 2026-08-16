@@ -1,9 +1,9 @@
 import { isGitRepo, getGitRoot, listTrackedFiles } from "@vortex/git";
 import { chunkFile, LocalEmbedder, VectorStore, BM25Index, scanFiles, HybridRetriever } from "@vortex/retrieval";
-import { createQueryChunk } from "@vortex/shared";
+import { createQueryChunk, SUPPORTED_EXTENSIONS } from "@vortex/shared";
 import * as path from "path";
 import * as fs from "fs";
-import { initDatabase } from "@vortex/db";
+import { initDatabase, prisma } from "@vortex/db";
 
 export class Indexer {
   private embedder: LocalEmbedder;
@@ -36,18 +36,14 @@ export class Indexer {
       try {
         const tracked = listTrackedFiles(root).filter(file => {
           const ext = path.extname(file);
-          const supportedExts = [
-            '.ts', '.tsx', '.js', '.jsx',
-            '.py', '.go', '.rs', '.java',
-            '.cpp', '.hpp', '.c', '.h',
-            '.rb', '.php', '.html', '.css'
-          ];
-          return supportedExts.includes(ext) && !file.includes('node_modules');
+          return SUPPORTED_EXTENSIONS.has(ext) && !file.includes('node_modules');
         });
         if (tracked.length > 0) {
           files = tracked;
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn("Failed to list git-tracked files:", e);
+      }
     }
 
     if (files.length === 0) {
@@ -56,22 +52,42 @@ export class Indexer {
       }
     }
 
+    // Track which files we're processing for stale cleanup
+    const processedFiles = new Set<string>();
     let totalChunks = 0;
 
     for (const file of files) {
       try {
-        // Suppressed log for TUI
-        // console.log(`Processing ${file}...`);
+        processedFiles.add(file);
+
+        // Get existing chunk IDs for this file before processing
+        const existingIds = await this.store.getIdsByFile(file);
+
         const chunks = chunkFile(file);
 
         if (chunks.length === 0) {
+          // File produced no chunks — remove any stale ones
+          if (existingIds.length > 0) {
+            await this.store.deleteByFile(file);
+            this.bm25Index.removeDocuments(existingIds);
+          }
           continue;
         }
-
 
         const embeddings = await this.embedder.embedChunks(chunks);
         await this.store.upsert(chunks, embeddings);
 
+        // Remove orphaned chunks (symbols deleted/renamed since last index)
+        const newIds = new Set(chunks.map(c => c.id));
+        const orphanedIds = existingIds.filter(id => !newIds.has(id));
+        if (orphanedIds.length > 0) {
+          for (const id of orphanedIds) {
+            try {
+              await prisma.chunk.delete({ where: { id } });
+            } catch {}
+          }
+          this.bm25Index.removeDocuments(orphanedIds);
+        }
 
         this.bm25Index.addDocuments(chunks);
 
@@ -81,6 +97,24 @@ export class Indexer {
       }
     }
 
+    // Clean up chunks from files that are no longer tracked
+    try {
+      const allDbFiles = await prisma.chunk.findMany({
+        select: { file: true },
+        distinct: ['file'],
+      });
+      for (const { file: dbFile } of allDbFiles) {
+        if (!processedFiles.has(dbFile)) {
+          const staleIds = await this.store.getIdsByFile(dbFile);
+          if (staleIds.length > 0) {
+            await this.store.deleteByFile(dbFile);
+            this.bm25Index.removeDocuments(staleIds);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to clean up stale file chunks:", err);
+    }
 
     const bm25Path = path.join(cwd, ".vortex-bm25.json");
     try {
@@ -89,12 +123,6 @@ export class Indexer {
     } catch (err) {
       console.warn("Failed to persist BM25 index:", err);
     }
-
-    // Suppressed logs for TUI
-    // console.log(`\nIndexing complete.`);
-    // console.log(`  Files processed: ${files.length}`);
-    // console.log(`  Chunks indexed: ${totalChunks}`);
-    // console.log(`  BM25 documents: ${this.bm25Index.documentCount}`);
 
     return {
       filesProcessed: files.length,

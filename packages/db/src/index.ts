@@ -38,6 +38,11 @@ export async function initDatabase() {
     );
   `);
 
+  // Indexes for common query patterns (stale cleanup, graph lookups, per-file ops)
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "idx_chunk_file" ON "Chunk"("file");`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "idx_chunk_name" ON "Chunk"("name");`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "idx_chunk_symbolPath" ON "Chunk"("symbolPath");`);
+
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Memory" (
       "id" TEXT NOT NULL PRIMARY KEY,

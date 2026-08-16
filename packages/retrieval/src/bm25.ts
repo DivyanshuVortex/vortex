@@ -58,12 +58,16 @@ export class BM25Index {
       kind: chunk.kind,
     }));
 
-    const existingIds = new Set([]);
-
     for (const doc of documents) {
       try {
-        this.index.add(doc);
-      } catch {}
+        if (this.index.has(doc.id)) {
+          this.index.replace(doc);
+        } else {
+          this.index.add(doc);
+        }
+      } catch (err) {
+        console.warn(`[BM25] Failed to add/replace document ${doc.id}:`, err);
+      }
     }
   }
 

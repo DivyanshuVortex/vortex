@@ -13,7 +13,7 @@ export interface ScoredChunk {
   chunk: Chunk;
   score: number;
   /** Which retrieval method contributed this result */
-  source: "vector" | "bm25" | "reranker";
+  source: "vector" | "bm25" | "reranker" | "graph";
 }
 
 /**

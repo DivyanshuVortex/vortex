@@ -86,6 +86,7 @@ export class VectorStore {
 
     const dbChunks = await prisma.chunk.findMany({
       where: whereClause,
+      take: 1000, // Safety limit to prevent OOM on large repos
       select: {
         id: true,
         file: true,
@@ -115,7 +116,9 @@ export class VectorStore {
         try {
           const chunkEmbedding = JSON.parse(dbChunk.embedding) as number[];
           similarity = cosineSimilarity(queryEmbedding, chunkEmbedding);
-        } catch(e) {}
+        } catch(e) {
+          console.warn(`[VectorStore] Failed to parse embedding for chunk ${dbChunk.id}:`, e);
+        }
       }
 
 

@@ -249,19 +249,9 @@ export function chunkFile(
 
     const actualContentNode = contentNode ?? node;
 
-    let content = actualContentNode.getText(sourceFile);
+    const content = actualContentNode.getText(sourceFile);
     const startLine = getLine(actualContentNode.getStart(sourceFile));
     const endLine = getLine(actualContentNode.getEnd());
-
-    // Add overlap: prepend up to 30 lines of preceding context
-    if (startLine > 1) {
-      const allLines = source.split('\n');
-      const startIdx = Math.max(0, startLine - 1 - 30);
-      const prepended = allLines.slice(startIdx, startLine - 1).join('\n');
-      if (prepended.trim().length > 0) {
-        content = `// Context Overlap:\n${prepended}\n// End Overlap\n${content}`;
-      }
-    }
 
     const kind =
       getChunkKind(node);
@@ -332,14 +322,16 @@ export function chunkFile(
 
     chunks.push(chunk);
 
-    console.log({
-      symbol:
-        chunk.symbolPath,
-      kind: chunk.kind,
-      exported:
-        chunk.isExported,
-      lines: `${startLine}-${endLine}`,
-    });
+    if (process.env.DEBUG) {
+      console.log({
+        symbol:
+          chunk.symbolPath,
+        kind: chunk.kind,
+        exported:
+          chunk.isExported,
+        lines: `${startLine}-${endLine}`,
+      });
+    }
   }
 
   function visit(
@@ -500,8 +492,8 @@ export function chunkFile(
   if (chunks.length === 0 && source.trim().length > 0) {
     const filename = path.basename(filePath);
     const basename = path.basename(filePath, path.extname(filePath));
-    const hash = getHash(source);
     
+    // Extract dependencies using language-agnostic regex patterns
     const deps = new Set<string>();
 
     const pyRegex = /(?:^|\n)\s*(?:from|import)\s+([a-zA-Z0-9_.]+)/g;
@@ -535,21 +527,62 @@ export function chunkFile(
       }
     }
 
-    chunks.push({
-      id: `${filename}:${hash.slice(0, 12)}`,
-      file: filePath,
-      language: getLanguage(filePath),
-      name: basename,
-      symbolPath: filename,
-      kind: "function" as ChunkKind,
-      isExported: false,
-      isAsync: false,
-      dependencies: Array.from(deps),
-      startLine: 1,
-      endLine: source.split('\n').length,
-      hash: hash,
-      content: source,
-    });
+    const allDeps = Array.from(deps);
+    const allLines = source.split('\n');
+    const WINDOW_SIZE = 100;
+    const WINDOW_OVERLAP = 20;
+
+    if (allLines.length <= WINDOW_SIZE) {
+      // Small file — single chunk
+      const hash = getHash(source);
+      chunks.push({
+        id: `${filename}:${hash.slice(0, 12)}`,
+        file: filePath,
+        language: getLanguage(filePath),
+        name: basename,
+        symbolPath: filename,
+        kind: "function" as ChunkKind,
+        isExported: false,
+        isAsync: false,
+        dependencies: allDeps,
+        startLine: 1,
+        endLine: allLines.length,
+        hash: hash,
+        content: source,
+      });
+    } else {
+      // Large file — split into overlapping windows
+      const step = WINDOW_SIZE - WINDOW_OVERLAP;
+      let windowIndex = 0;
+      for (let start = 0; start < allLines.length; start += step) {
+        const end = Math.min(start + WINDOW_SIZE, allLines.length);
+        const windowContent = allLines.slice(start, end).join('\n');
+        const windowHash = getHash(windowContent);
+        const windowStartLine = start + 1;
+        const windowEndLine = end;
+        const windowName = `${basename}_w${windowIndex}`;
+
+        chunks.push({
+          id: `${filename}:w${windowIndex}:${windowHash.slice(0, 12)}`,
+          file: filePath,
+          language: getLanguage(filePath),
+          name: windowName,
+          symbolPath: `${filename}:w${windowIndex}`,
+          kind: "function" as ChunkKind,
+          isExported: false,
+          isAsync: false,
+          dependencies: allDeps,
+          startLine: windowStartLine,
+          endLine: windowEndLine,
+          hash: windowHash,
+          content: windowContent,
+        });
+
+        windowIndex++;
+        // If we've reached the end, stop
+        if (end >= allLines.length) break;
+      }
+    }
   }
 
   return chunks;

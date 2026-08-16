@@ -29,7 +29,14 @@ export class LocalEmbedder {
 
     textToEmbed += `\nCode:\n${chunk.content}`;
 
-    return textToEmbed;
+    // MiniLM-L6-v2 has a 256 token limit (~800 chars for code).
+    // Truncate to ensure the embedding meaningfully represents the content.
+    return this.truncateForModel(textToEmbed);
+  }
+
+  private truncateForModel(text: string, maxChars: number = 800): string {
+    if (text.length <= maxChars) return text;
+    return text.slice(0, maxChars);
   }
 
   public async embedChunks(chunks: Chunk[]): Promise<number[][]> {

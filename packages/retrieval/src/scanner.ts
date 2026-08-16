@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import ignore from 'ignore';
+import { SUPPORTED_EXTENSIONS } from '@vortex/shared';
 
 function loadGitignore(dir : string){
     const ign = ignore();
@@ -16,12 +17,10 @@ function loadGitignore(dir : string){
     return ign;
 }
 
-const SUPPORTED_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.py', '.go']);
-let totalfiles = 0;
-let ignoredFilesCount = 0;
-
 export async function* scanFiles(rootDir : string) : AsyncGenerator<string> {
     const ign = loadGitignore(rootDir);
+    let totalFiles = 0;
+    let ignoredFilesCount = 0;
 
     async function* walk(dir : string) : AsyncGenerator<string> {
         const entries = await fs.promises.readdir(dir, { withFileTypes: true });
@@ -33,17 +32,16 @@ export async function* scanFiles(rootDir : string) : AsyncGenerator<string> {
                 ignoredFilesCount++;
                 continue;
             }
-            totalfiles++;
             if (entry.isDirectory()) {
                 yield* walk(fullPath);
             } else if (entry.isFile()) {
-                if (SUPPORTED_EXTS.has(path.extname(fullPath))) {
+                totalFiles++;
+                if (SUPPORTED_EXTENSIONS.has(path.extname(fullPath))) {
                     yield fullPath;
                 }
             }
-}
+        }
     }
 
-yield* walk(rootDir);
-
+    yield* walk(rootDir);
 }

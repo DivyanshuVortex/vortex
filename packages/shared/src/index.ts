@@ -1,4 +1,19 @@
 // ─────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────
+
+/**
+ * Canonical set of file extensions supported by the ingest pipeline.
+ * Used by both the scanner (fallback walk) and the indexer (git-tracked filter).
+ */
+export const SUPPORTED_EXTENSIONS = new Set([
+  '.ts', '.tsx', '.js', '.jsx',
+  '.py', '.go', '.rs', '.java',
+  '.cpp', '.hpp', '.c', '.h',
+  '.rb', '.php', '.html', '.css'
+]);
+
+// ─────────────────────────────────────────────
 // Shared Types
 // ─────────────────────────────────────────────
 
@@ -63,6 +78,7 @@ export function parseGitHubUrl(url: string): { owner: string; repo: string } | n
  * for comparing embeddings.
  */
 export function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length) return 0;
   let dotProduct = 0;
   let normA = 0;
   let normB = 0;

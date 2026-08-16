@@ -89,7 +89,7 @@ export class GraphRetriever {
       return {
         chunk,
         score: 0.5, // Base score for graph neighbors
-        source: "graph" as any, 
+        source: "graph",
       };
     });
   }
