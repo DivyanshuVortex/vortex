@@ -40,7 +40,7 @@ export default async function handleReviewPR(job: Job<ReviewPRJobData>) {
 
     // Deduplicate chunks by ID
     const uniqueChunks = Array.from(
-      new Map(allChunks.map((c) => [c.id, c])).values()
+      new Map(allChunks.map((res) => [res.chunk.id, res.chunk])).values()
     );
 
     // 3. Generate multi-agent review (Security + Architecture + Synthesis)

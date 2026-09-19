@@ -1,6 +1,6 @@
 {
   "name": "@vortex/harness",
-  "version": "1.0.0",
+  "version": "0.20.0",
   "description": "Evaluation harness for vortex agents",
   "main": "src/runner.ts",
   "scripts": {

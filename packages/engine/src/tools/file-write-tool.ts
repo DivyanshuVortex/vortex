@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { AgentTool, ApprovalCallback } from "./tool-types";
-import { VectorStore, LocalEmbedder, chunkFile, BM25Index } from "@vortex/retrieval";
+import { VectorStore, LocalEmbedder, chunkFile, BM25Index, classifyFile } from "@vortex/retrieval";
 
 /**
  * FileWriteTool — Writes a file to the local codebase.
@@ -80,7 +80,8 @@ export class FileWriteTool implements AgentTool {
             }
           }
 
-          const chunks = chunkFile(absolutePath);
+          const classification = classifyFile(absolutePath);
+          const chunks = chunkFile(absolutePath, classification);
           if (chunks.length > 0) {
             const embeddings = await this.embedder.embedChunks(chunks);
             await this.vectorStore.upsert(chunks, embeddings);

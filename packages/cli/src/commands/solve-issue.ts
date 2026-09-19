@@ -48,11 +48,11 @@ ${comments.map((c: any, i: number) => `Comment ${i + 1} (@${c.user?.login}): ${c
 Please fix this issue in the codebase.`;
 
 
-    const contextChunks = relevantContext.map((c: any) => ({
-      file: c.file,
-      symbolPath: c.symbolPath || "anonymous",
-      content: c.content,
-      kind: c.kind || "unknown",
+    const contextChunks = relevantContext.map((res: any) => ({
+      file: res.chunk.file,
+      symbolPath: res.chunk.symbolPath || "anonymous",
+      content: res.chunk.content,
+      kind: res.chunk.kind || "unknown",
     }));
 
 

@@ -1,39 +1,21 @@
 import { Chunk } from "./chunker";
 import { VectorStore } from "./store";
 import { BM25Index } from "./bm25";
-import { CrossEncoderReranker, ScoredChunk } from "./reranker";
+import { CrossEncoderReranker } from "./reranker";
 import { LocalEmbedder } from "./embedder";
+import { GraphRetriever } from "./graph";
 import { createQueryChunk } from "@vortex/shared";
+import {
+  RetrievalResult,
+  RetrievalSource,
+  ScoredChunk,
+  HybridRetrieverConfig,
+} from "./types";
 
 /**
- * Configuration for the hybrid retrieval pipeline.
- */
-export interface HybridRetrieverConfig {
-  /** Number of candidates to fetch from each retrieval method before merging (default: 20) */
-  candidatesPerMethod?: number;
-  /** Final number of results after reranking (default: 10) */
-  topK?: number;
-  /** Whether to use the cross-encoder reranker (default: true). Disable for faster but less accurate results. */
-  useReranker?: boolean;
-  /** Whether to retrieve dependency graph neighbors (default: true). */
-  useGraph?: boolean;
-}
-
-/**
- * Result from the hybrid retriever, including provenance information.
- */
-export interface HybridSearchResult {
-  chunk: Chunk;
-  /** Final score after fusion/reranking */
-  score: number;
-  /** Which retrieval methods contributed this result */
-  sources: ("vector" | "bm25" | "reranker" | "graph")[];
-}
-
-/**
- * HybridRetriever — 3-Stage Retrieval Pipeline
+ * HybridRetriever — Multi-Stage Retrieval Pipeline
  *
- * Combines three retrieval strategies for maximum precision:
+ * Combines multiple retrieval strategies for maximum precision:
  *
  * ┌──────────────┐    ┌──────────────┐
  * │  Vector DB   │    │  BM25 Index  │
@@ -48,18 +30,16 @@ export interface HybridSearchResult {
  *     └──────────┬──────────┘
  *                │
  *     ┌──────────▼──────────┐
+ *     │  Graph Expansion    │
+ *     └──────────┬──────────┘
+ *                │
+ *     ┌──────────▼──────────┐
  *     │  Cross-Encoder      │
  *     │  Reranker           │
  *     └──────────┬──────────┘
  *                │
  *          Top-K Results
- *
- * Stage 1 — Vector Search: Finds semantically similar code chunks.
- * Stage 2 — BM25 Search: Finds exact keyword matches (function names, etc.).
- * Stage 3 — Cross-Encoder: Reranks merged results for maximum accuracy.
  */
-import { GraphRetriever } from "./graph";
-
 export class HybridRetriever {
   private vectorStore: VectorStore;
   private bm25Index: BM25Index;
@@ -80,39 +60,39 @@ export class HybridRetriever {
   }
 
   /**
-   * Performs hybrid search combining vector search, BM25, and cross-encoder reranking.
+   * Performs hybrid search combining vector search, BM25, graph expansion,
+   * and cross-encoder reranking.
    *
    * @param query - The user's search query
    * @param config - Optional configuration for the retrieval pipeline
-   * @returns Array of HybridSearchResult sorted by final relevance score
+   * @returns Array of RetrievalResult sorted by final relevance score
    */
   public async search(
     query: string,
     config?: HybridRetrieverConfig
-  ): Promise<HybridSearchResult[]> {
+  ): Promise<RetrievalResult[]> {
     const candidatesPerMethod = config?.candidatesPerMethod ?? 20;
     const topK = config?.topK ?? 10;
     const useReranker = config?.useReranker ?? true;
     const useGraph = config?.useGraph ?? true;
 
-
+    // Stage 1: Parallel vector + BM25 search
     const [vectorResults, bm25Results] = await Promise.all([
       this.vectorSearch(query, candidatesPerMethod),
       this.bm25Search(query, candidatesPerMethod),
     ]);
 
-
+    // Stage 2: Initial RRF fusion to find focal chunks for graph expansion
     let graphResults: ScoredChunk[] = [];
     if (useGraph) {
-
       const initialFused = this.reciprocalRankFusion(vectorResults, bm25Results, [], 5);
-      const focalChunks = initialFused.map((r) => r.chunk);
+      const focalChunks = initialFused.map(r => r.chunk);
       if (focalChunks.length > 0) {
         graphResults = await this.graphRetriever.getNeighbors(focalChunks, candidatesPerMethod);
       }
     }
 
-
+    // Stage 3: Full RRF fusion with graph results
     const fusedResults = this.reciprocalRankFusion(
       vectorResults,
       bm25Results,
@@ -120,28 +100,26 @@ export class HybridRetriever {
       topK * 2
     );
 
-
+    // Stage 4: Cross-encoder reranking
     if (useReranker && fusedResults.length > 0) {
-      const chunksToRerank = fusedResults.map((r) => r.chunk);
+      const chunksToRerank = fusedResults.map(r => r.chunk);
       const reranked = await this.reranker.rerank(query, chunksToRerank, topK);
 
-      return reranked.map((scored) => {
-
-        const originalResult = fusedResults.find(
-          (r) => r.chunk.id === scored.chunk.id
-        );
+      return reranked.map((scored, rank) => {
+        const originalResult = fusedResults.find(r => r.chunk.id === scored.chunk.id);
         return {
           chunk: scored.chunk,
           score: scored.score,
-          sources: [
-            ...(originalResult?.sources ?? []),
-            "reranker" as const,
-          ],
+          source: "hybrid" as RetrievalSource,
+          rank: rank + 1,
         };
       });
     }
 
-    return fusedResults.slice(0, topK);
+    return fusedResults.slice(0, topK).map((r, rank) => ({
+      ...r,
+      rank: rank + 1,
+    }));
   }
 
   /**
@@ -152,22 +130,18 @@ export class HybridRetriever {
     limit: number
   ): Promise<ScoredChunk[]> {
     try {
-
       const queryEmbeddings = await this.embedder.embedChunks([
         createQueryChunk(query),
       ]);
 
       if (queryEmbeddings.length === 0 || !queryEmbeddings[0]) return [];
 
-      const results = await this.vectorStore.search(
-        queryEmbeddings[0],
-        limit
-      );
+      const results = await this.vectorStore.search(queryEmbeddings[0], limit);
 
-      return results.map((chunk: any) => ({
-        chunk,
-        score: chunk.score ?? 0,
-        source: "vector" as const,
+      return results.map(r => ({
+        chunk: r.chunk,
+        score: r.score,
+        source: "vector" as RetrievalSource,
       }));
     } catch (err) {
       console.warn("[HybridRetriever] Vector search failed:", err);
@@ -177,7 +151,6 @@ export class HybridRetriever {
 
   /**
    * BM25 search — finds exact keyword matches.
-   * Returns chunk objects by looking up IDs in the vector store.
    */
   private async bm25Search(
     query: string,
@@ -188,9 +161,8 @@ export class HybridRetriever {
 
       if (bm25Results.length === 0) return [];
 
-
       const { prisma } = await import("@vortex/db");
-      const chunkIds = bm25Results.map((r) => r.id);
+      const chunkIds = bm25Results.map(r => r.id);
 
       const dbChunks = await prisma.chunk.findMany({
         where: { id: { in: chunkIds } },
@@ -241,10 +213,7 @@ export class HybridRetriever {
    *
    * RRF assigns each result a score based on its rank in each method:
    *   score(d) = Σ 1 / (k + rank(d))
-   * where k is a constant (typically 60) that controls the diminishing return of lower ranks.
-   *
-   * This is superior to simple score normalization because it's robust to
-   * score distribution differences between retrieval methods.
+   * where k is a constant (typically 60) that controls diminishing returns.
    */
   private reciprocalRankFusion(
     vectorResults: ScoredChunk[],
@@ -252,68 +221,45 @@ export class HybridRetriever {
     graphResults: ScoredChunk[],
     limit: number,
     k: number = 60
-  ): HybridSearchResult[] {
+  ): RetrievalResult[] {
     const scoreMap = new Map<
       string,
-      { chunk: Chunk; score: number; sources: ("vector" | "bm25" | "graph")[] }
+      { chunk: Chunk; score: number; sources: RetrievalSource[] }
     >();
 
+    const addResults = (results: ScoredChunk[], source: RetrievalSource) => {
+      results.forEach((result, rank) => {
+        const rrfScore = 1 / (k + rank + 1);
+        const existing = scoreMap.get(result.chunk.id);
 
-    vectorResults.forEach((result, rank) => {
-      const rrfScore = 1 / (k + rank + 1);
-      const existing = scoreMap.get(result.chunk.id);
+        if (existing) {
+          existing.score += rrfScore;
+          if (!existing.sources.includes(source)) {
+            existing.sources.push(source);
+          }
+        } else {
+          scoreMap.set(result.chunk.id, {
+            chunk: result.chunk,
+            score: rrfScore,
+            sources: [source],
+          });
+        }
+      });
+    };
 
-      if (existing) {
-        existing.score += rrfScore;
-        existing.sources.push("vector");
-      } else {
-        scoreMap.set(result.chunk.id, {
-          chunk: result.chunk,
-          score: rrfScore,
-          sources: ["vector"],
-        });
-      }
-    });
-
-
-    bm25Results.forEach((result, rank) => {
-      const rrfScore = 1 / (k + rank + 1);
-      const existing = scoreMap.get(result.chunk.id);
-
-      if (existing) {
-        existing.score += rrfScore;
-        existing.sources.push("bm25");
-      } else {
-        scoreMap.set(result.chunk.id, {
-          chunk: result.chunk,
-          score: rrfScore,
-          sources: ["bm25"],
-        });
-      }
-    });
-
-
-    graphResults.forEach((result, rank) => {
-      const rrfScore = 1 / (k + rank + 1);
-      const existing = scoreMap.get(result.chunk.id);
-
-      if (existing) {
-        existing.score += rrfScore;
-        existing.sources.push("graph");
-      } else {
-        scoreMap.set(result.chunk.id, {
-          chunk: result.chunk,
-          score: rrfScore,
-          sources: ["graph"],
-        });
-      }
-    });
-
+    addResults(vectorResults, "vector");
+    addResults(bm25Results, "bm25");
+    addResults(graphResults, "graph");
 
     const fused = Array.from(scoreMap.values()).sort(
       (a, b) => b.score - a.score
     );
 
-    return fused.slice(0, limit);
+    return fused.slice(0, limit).map((item, rank) => ({
+      chunk: item.chunk,
+      score: item.score,
+      source: "hybrid" as RetrievalSource,
+      rank: rank + 1,
+    }));
   }
 }

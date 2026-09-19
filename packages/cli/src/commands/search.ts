@@ -29,7 +29,7 @@ export async function searchCommand(options: any) {
     );
     
     const flatResults = allResults.flat();
-    const uniqueResults = Array.from(new Map(flatResults.map((c) => [c.id, c])).values()).sort((a, b) => b.score - a.score).slice(0, parseInt(options.limit, 10));
+    const uniqueResults = Array.from(new Map(flatResults.map((res) => [res.chunk.id, res])).values()).sort((a, b) => b.score - a.score).slice(0, parseInt(options.limit, 10));
 
     if (uniqueResults.length === 0) {
       spinner.fail("No relevant code found.");
@@ -41,7 +41,7 @@ export async function searchCommand(options: any) {
     const memoryService = new MemoryService();
     const memories = await memoryService.recallRelevantMemories(options.query, 3);
     
-    const answer = await agent.answerQueryWithContext(options.query, uniqueResults);
+    const answer = await agent.answerQueryWithContext(options.query, uniqueResults.map(r => r.chunk));
     
     spinner.succeed("Analysis complete!\n");
     
@@ -60,9 +60,9 @@ export async function searchCommand(options: any) {
     
     console.log(chalk.cyan.dim(" Reference Material (Hybrid Retrieval)"));
     uniqueResults.forEach((res: any, i: number) => {
-      const sources = res.sources ? res.sources.join("+") : "vector";
+      const source = res.source || "vector";
       const scoreStr = res.score ? (res.score * 100).toFixed(1) + '%' : 'N/A';
-      console.log(chalk.gray(`  │ [${i + 1}] ${res.file.replace(process.cwd(), '')} ➔ ${res.symbolPath || '(anonymous)'} (${scoreStr}) [${sources}]`));
+      console.log(chalk.gray(`  │ [${i + 1}] ${res.chunk.file.replace(process.cwd(), '')} ➔ ${res.chunk.symbolPath || '(anonymous)'} (${scoreStr}) [${source}]`));
     });
 
     if (memories.length > 0) {

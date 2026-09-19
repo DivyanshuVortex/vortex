@@ -28,7 +28,7 @@ export class RagSearchTool implements AgentTool {
       let response = `--- RAG Search Results for: "${query}" ---\n`;
       for (const result of results) {
         const c = result.chunk;
-        response += `\n[File: ${c.file} | Symbol: ${c.symbolPath || 'anonymous'}]\n${c.content}\n`;
+        response += `\n[File: ${c.file} | Symbol: ${c.symbolPath || 'anonymous'} | Score: ${result.score.toFixed(3)}]\n${c.content}\n`;
       }
 
       return response;

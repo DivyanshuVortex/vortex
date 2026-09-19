@@ -88,7 +88,7 @@ export async function reviewCommand(options: any) {
     }
 
     const uniqueChunks = Array.from(
-      new Map(allChunks.map((c) => [c.id, c])).values()
+      new Map(allChunks.map((res) => [res.chunk.id, res.chunk])).values()
     );
 
     spinner.text = "Checking memory for relevant past reviews...";
@@ -169,11 +169,10 @@ export async function reviewCommand(options: any) {
 
     if (uniqueChunks.length > 0) {
       console.log(chalk.cyan.dim("\n Cross-Referenced Architecture:"));
-      uniqueChunks.forEach((res: any, i: number) => {
-        const sources = res.sources ? res.sources.join("+") : "vector";
+      uniqueChunks.forEach((chunk: any, i: number) => {
         console.log(
           chalk.gray(
-            `  │ [${i + 1}] ${res.file.replace(process.cwd(), "")} ➔ ${res.symbolPath || "(anonymous)"} [${sources}]`
+            `  │ [${i + 1}] ${chunk.file.replace(process.cwd(), "")} ➔ ${chunk.symbolPath || "(anonymous)"}`
           )
         );
       });

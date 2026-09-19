@@ -71,11 +71,11 @@ export async function solveCommand(prompt: string, options: { autoApprove?: bool
       try {
         const indexer = new Indexer();
         const relevantContext = await indexer.hybridSearch(prompt, 15);
-        options.contextChunks = relevantContext.map((c: any) => ({
-          file: c.file,
-          symbolPath: c.symbolPath || "anonymous",
-          content: c.content,
-          kind: c.kind || "unknown",
+        options.contextChunks = relevantContext.map((res: any) => ({
+          file: res.chunk.file,
+          symbolPath: res.chunk.symbolPath || "anonymous",
+          content: res.chunk.content,
+          kind: res.chunk.kind || "unknown",
         }));
       } catch (e) {
         console.warn(chalk.yellow("⚠️ Could not search vector store. Did you run 'vortex init'?"));

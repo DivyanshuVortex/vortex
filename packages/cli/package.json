@@ -1,13 +1,13 @@
 {
   "name": "@vortex-ai/cli",
-  "version": "0.1.80",
+  "version": "0.20.0",
   "description": "Vortex CLI - The main entry point",
   "main": "./dist/index.js",
   "bin": {
     "vortex": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --external @xenova/transformers && cp ../db/prisma/schema.prisma ./schema.prisma",
+    "build": "tsup src/index.ts --format cjs,esm --external @xenova/transformers --external tree-sitter --external tree-sitter-python --external tree-sitter-go --external tree-sitter-rust --external tree-sitter-java --external tree-sitter-c --external tree-sitter-cpp --external hnswlib-node && cp ../db/prisma/schema.prisma ./schema.prisma",
     "dev": "tsx src/index.ts",
     "watch": "tsup src/index.ts --format cjs,esm --watch",
     "lint": "eslint .",

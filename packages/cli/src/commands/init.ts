@@ -13,7 +13,15 @@ export async function initCommand(options: any) {
 
   const indexer = new Indexer();
   try {
-    const stats = await indexer.indexRepository(process.cwd());
+    const stats = await indexer.indexRepository(process.cwd(), {
+      onProgress: ({ processed, total, estimatedRemaining }) => {
+        const remainingSeconds = Math.round(estimatedRemaining / 1000);
+        const m = Math.floor(remainingSeconds / 60);
+        const s = remainingSeconds % 60;
+        const timeStr = m > 0 ? `${m}m ${s}s` : `${s}s`;
+        spinner.text = `Scanning repository and building indices... [${processed}/${total}] ~${timeStr} remaining`;
+      }
+    });
 
     const durationStr = ((Date.now() - startTime) / 1000).toFixed(1) + "s";
     spinner.succeed(chalk.green(`${stats.filesProcessed} files indexed  ·  ${durationStr}\n`));

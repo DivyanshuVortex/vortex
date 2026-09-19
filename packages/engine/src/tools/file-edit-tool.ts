@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { AgentTool, ApprovalCallback } from "./tool-types";
-import { VectorStore, LocalEmbedder, chunkFile, BM25Index } from "@vortex/retrieval";
+import { VectorStore, LocalEmbedder, chunkFile, BM25Index, classifyFile } from "@vortex/retrieval";
 
 /**
  * FileEditTool — Modifies an existing file by replacing a specific block of text.
@@ -97,7 +97,8 @@ export class FileEditTool implements AgentTool {
             }
           }
 
-          const chunks = chunkFile(absolutePath);
+          const classification = classifyFile(absolutePath);
+          const chunks = chunkFile(absolutePath, classification);
           if (chunks.length > 0) {
             const embeddings = await this.embedder.embedChunks(chunks);
             await this.vectorStore.upsert(chunks, embeddings);

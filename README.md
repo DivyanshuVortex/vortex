@@ -109,7 +109,7 @@ Instead of passing code blindly to an LLM, Vortex uses specialized agents:
 Vortex utilizes a multi-layered memory architecture to maintain context without exceeding token limits or sacrificing privacy.
 
 1. **Persistent Agentic Memory (`MemoryService`)**: Acts as episodic memory. Stores review history, architectural decisions, and known bugs in a local SQLite database for cross-PR consistency.
-2. **Hybrid RAG Indexing (`HybridRetriever`)**: Uses AST-aware chunking, on-device Xenova Transformer dense vector embeddings, and sparse lexical BM25 indexing. Cross-encoder reranking ensures only the most relevant context is fed to the LLM.
+2. **Hybrid RAG Indexing (`HybridRetriever`)**: Uses AST-aware chunking (powered by native `tree-sitter` for TS, Python, Go, Rust, Java, C/C++), on-device Xenova Transformer dense vector embeddings (accelerated via native ONNX Runtime), and sparse lexical BM25 indexing. An HNSW Approximate Nearest Neighbor (ANN) index ensures lightning-fast vector search over millions of chunks. Finally, cross-encoder reranking ensures only the most relevant context is fed to the LLM.
 
 ```mermaid
 graph TD
@@ -150,8 +150,8 @@ Running autonomous agents on your local machine requires strict safety rails. Vo
 ## Performance & Privacy
 
 Vortex is engineered for speed and cost-efficiency, keeping the heavy lifting local to your machine:
-- **Zero-Cost Indexing**: Generating embeddings for your repository runs entirely on-device via Xenova Transformers, meaning **no API costs** and **complete privacy**.
-- **Token Efficiency**: By intelligently chunking code (AST-aware) and only sending the most relevant segments to the LLM, Vortex uses significantly fewer tokens.
+- **Zero-Cost Indexing**: Generating embeddings for your repository runs entirely on-device via Xenova Transformers (accelerated 3x-5x via native `onnxruntime-node`), meaning **no API costs** and **complete privacy**.
+- **Token Efficiency**: By intelligently chunking code (AST-aware using multi-language `tree-sitter`) and only sending the most relevant segments to the LLM via Cross-Encoder Reranking, Vortex uses significantly fewer tokens.
 
 ---
 

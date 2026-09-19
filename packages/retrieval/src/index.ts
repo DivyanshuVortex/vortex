@@ -6,3 +6,7 @@ export * from "./bm25";
 export * from "./reranker";
 export * from "./hybrid-retriever";
 export * from "./graph";
+export * from "./types";
+export * from "./classifier";
+export { getParserRegistry, resetParserRegistry } from "./parsers/parser-registry";
+export type { LanguageParser } from "./parsers/parser-registry";

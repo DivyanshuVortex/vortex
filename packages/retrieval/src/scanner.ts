@@ -1,47 +1,57 @@
-import fs from 'fs';
-import path from 'path';
-import ignore from 'ignore';
-import { SUPPORTED_EXTENSIONS } from '@vortex/shared';
+import fs from "fs";
+import path from "path";
+import { classifyFile, loadIgnoreRules, INDEXABLE_EXTENSIONS } from "./classifier";
+import { FileClassification } from "./types";
 
-function loadGitignore(dir : string){
-    const ign = ignore();
-    const gitignorePath = path.join(dir, '.gitignore');
-    try {
-        const content = fs.readFileSync(gitignorePath, 'utf-8');
-        ign.add(content);
-    }catch (e) {
-    }
-
-      ign.add(["node_modules", ".git", "dist", "build", "out", ".next",
-            "coverage", "logs", "*.log", ".*"]);
-    return ign;
+/**
+ * Result from the file scanner including classification.
+ */
+export interface ScannedFile {
+  /** Absolute path to the file */
+  path: string;
+  /** Classification result */
+  classification: FileClassification;
 }
 
-export async function* scanFiles(rootDir : string) : AsyncGenerator<string> {
-    const ign = loadGitignore(rootDir);
-    let totalFiles = 0;
-    let ignoredFilesCount = 0;
+/**
+ * Scans a directory tree and yields files with their classifications.
+ *
+ * Respects .gitignore, .vortexignore, and built-in exclusion rules.
+ * Each yielded file includes its classification for the indexing pipeline.
+ */
+export async function* scanFiles(rootDir: string): AsyncGenerator<ScannedFile> {
+  const ign = loadIgnoreRules(rootDir);
 
-    async function* walk(dir : string) : AsyncGenerator<string> {
-        const entries = await fs.promises.readdir(dir, { withFileTypes: true });
-        for (const entry of entries) {
-            const fullPath = path.join(dir, entry.name);
-            const relativePath = path.relative(rootDir, fullPath);
+  async function* walk(dir: string): AsyncGenerator<ScannedFile> {
+    const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      const relativePath = path.relative(rootDir, fullPath);
 
-            if (ign.ignores(relativePath)) {
-                ignoredFilesCount++;
-                continue;
-            }
-            if (entry.isDirectory()) {
-                yield* walk(fullPath);
-            } else if (entry.isFile()) {
-                totalFiles++;
-                if (SUPPORTED_EXTENSIONS.has(path.extname(fullPath))) {
-                    yield fullPath;
-                }
-            }
+      if (ign.ignores(relativePath)) {
+        continue;
+      }
+
+      if (entry.isDirectory()) {
+        yield* walk(fullPath);
+      } else if (entry.isFile()) {
+        const classification = classifyFile(fullPath);
+        if (classification.shouldIndex) {
+          yield { path: fullPath, classification };
         }
+      }
     }
+  }
 
-    yield* walk(rootDir);
+  yield* walk(rootDir);
+}
+
+/**
+ * Legacy-compatible scanner that yields just file paths.
+ * Used for backward compatibility with code that expects string paths.
+ */
+export async function* scanFilePaths(rootDir: string): AsyncGenerator<string> {
+  for await (const scanned of scanFiles(rootDir)) {
+    yield scanned.path;
+  }
 }

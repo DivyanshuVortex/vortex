@@ -43,6 +43,22 @@ export async function initDatabase() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "idx_chunk_name" ON "Chunk"("name");`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "idx_chunk_symbolPath" ON "Chunk"("symbolPath");`);
 
+  // Schema migrations (additive, safe for existing databases)
+  // Add parentId for hierarchical chunk relationships
+  try {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Chunk" ADD COLUMN "parentId" TEXT;`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "idx_chunk_parentId" ON "Chunk"("parentId");`);
+  } catch {
+    // Column already exists — this is expected on subsequent runs
+  }
+
+  // Add fileCategory for file classification metadata
+  try {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Chunk" ADD COLUMN "fileCategory" TEXT DEFAULT 'source';`);
+  } catch {
+    // Column already exists
+  }
+
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Memory" (
       "id" TEXT NOT NULL PRIMARY KEY,

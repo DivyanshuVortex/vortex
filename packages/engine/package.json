@@ -1,10 +1,10 @@
 {
   "name": "@vortex/engine",
-  "version": "0.1.0",
+  "version": "0.20.0",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "build": "tsup src/index.ts --format cjs,esm --dts --external tree-sitter --external tree-sitter-python --external tree-sitter-go --external tree-sitter-rust --external tree-sitter-java --external tree-sitter-c --external tree-sitter-cpp --external hnswlib-node",
     "dev": "tsup src/index.ts --format cjs,esm --watch",
     "lint": "eslint .",
     "check-types": "tsc --noEmit"

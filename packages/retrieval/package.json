@@ -1,10 +1,10 @@
 {
   "name": "@vortex/retrieval",
-  "version": "0.1.0",
+  "version": "0.20.0",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "build": "tsup src/index.ts --format cjs,esm --dts --external tree-sitter --external tree-sitter-python --external tree-sitter-go --external tree-sitter-rust --external tree-sitter-java --external tree-sitter-c --external tree-sitter-cpp --external hnswlib-node",
     "dev": "tsup src/index.ts --format cjs,esm --watch",
     "lint": "eslint .",
     "check-types": "tsc --noEmit"
@@ -19,8 +19,16 @@
     "@vortex/db": "workspace:*",
     "@vortex/shared": "workspace:*",
     "@xenova/transformers": "^2.17.2",
+    "hnswlib-node": "^3.0.0",
     "ignore": "^7.0.5",
     "minisearch": "^7.2.0",
+    "tree-sitter": "^0.25.1",
+    "tree-sitter-c": "^0.24.1",
+    "tree-sitter-cpp": "^0.23.4",
+    "tree-sitter-go": "^0.25.0",
+    "tree-sitter-java": "^0.23.5",
+    "tree-sitter-python": "^0.25.0",
+    "tree-sitter-rust": "^0.24.0",
     "typescript": "5.9.2"
   }
 }
